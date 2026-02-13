@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MSME Negotiation AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="app-container">
+        <header class="app-header">
+            <div class="logo-area">
+                <i class="fa-solid fa-scale-balanced brand-icon"></i>
+                <div class="brand-text">
+                    <h1>MSME <span>Negotiation AI</span></h1>
+                </div>
+            </div>
+            <p class="subtitle">AI-assisted decision support for MSME dispute resolution</p>
+        </header>
+
+        <main class="main-content">
+            <div class="glass-card form-section">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-file-contract"></i> Case Details</h2>
+                    <p>Enter the specifics of the dispute below</p>
+                </div>
+
+                <form id="analysisForm" class="modern-form">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="claim_amount"><i class="fa-solid fa-indian-rupee-sign"></i> Claim Amount</label>
+                            <div class="input-wrapper">
+                                <input type="number" id="claim_amount" name="claim_amount" min="50000" max="5000000"
+                                    step="10000" value="480000" required placeholder="e.g. 500000">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="delay_days">
+                                <span><i class="fa-regular fa-clock"></i> Payment Delay</span>
+                                <span class="badge-value" id="delay_value_display">132 days</span>
+                            </label>
+                            <div class="range-wrapper">
+                                <input type="range" id="delay_days" name="delay_days" min="46" max="800" value="132"
+                                    oninput="document.getElementById('delay_value_display').textContent = this.value + ' days'">
+                                <div class="range-labels">
+                                    <span>46d</span>
+                                    <span>800d</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="document_count"><i class="fa-solid fa-copy"></i> Supporting Documents</label>
+                            <div class="select-wrapper">
+                                <select id="document_count" name="document_count" required>
+                                    <option value="1">1 Document</option>
+                                    <option value="2">2 Documents</option>
+                                    <option value="3" selected>3 Documents</option>
+                                    <option value="4">4+ Documents</option>
+                                </select>
+                                <i class="fa-solid fa-chevron-down select-arrow"></i>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dispute_type"><i class="fa-solid fa-gavel"></i> Dispute Type</label>
+                            <div class="select-wrapper">
+                                <select id="dispute_type" name="dispute_type" required>
+                                    {% for type in dispute_types %}
+                                    <option value="{{ type }}">{{ type }}</option>
+                                    {% endfor %}
+                                </select>
+                                <i class="fa-solid fa-chevron-down select-arrow"></i>
+                            </div>
+                        </div>
+
+                        <div class="form-group full-width">
+                            <label for="jurisdiction"><i class="fa-solid fa-map-location-dot"></i> State /
+                                Jurisdiction</label>
+                            <div class="select-wrapper">
+                                <select id="jurisdiction" name="jurisdiction" required>
+                                    {% for state in jurisdictions %}
+                                    <option value="{{ state }}">{{ state }}</option>
+                                    {% endfor %}
+                                </select>
+                                <i class="fa-solid fa-chevron-down select-arrow"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-analyze" id="analyzeBtn">
+                        <span class="btn-text">Analyze Case</span>
+                        <span class="btn-loader" style="display: none;">
+                            <i class="fa-solid fa-spinner fa-spin"></i> Analyzing...
+                        </span>
+                        <i class="fa-solid fa-arrow-right btn-icon"></i>
+                    </button>
+                </form>
+            </div>
+
+            <div class="glass-card result-section" id="resultSection" style="display: none;">
+                <div class="card-header result-header">
+                    <h2><i class="fa-solid fa-chart-pie"></i> Assessment Result</h2>
+                    <div class="priority-pill" id="priorityPill">
+                        <span class="dot"></span> <span id="priorityText"></span>
+                    </div>
+                </div>
+
+                <div class="export-section">
+                    <button id="exportPdfBtn" class="btn-export">
+                        <i class="fa-solid fa-file-pdf"></i>
+                        <span>Export Analysis PDF</span>
+                    </button>
+                    <button id="generateSettlementBtn" class="btn-export btn-settlement">
+                        <i class="fa-solid fa-file-contract"></i>
+                        <span>Generate Settlement Draft</span>
+                    </button>
+                </div>
+                <div class="result-grid">
+                    <div class="metric-box">
+                        <div class="circular-chart" id="circularChart">
+                            <svg viewBox="0 0 36 36" class="circular-chart-svg">
+                                <path class="circle-bg"
+                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                <path class="circle" id="circlePath"
+                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            </svg>
+                            <div class="percentage">
+                                <span class="number" id="probabilityNumber"></span><span class="symbol">%</span>
+                                <span class="label">Probability</span>
+                            </div>
+                        </div>
+                        <p class="metric-desc">Likelihood of successful settlement</p>
+                        <p class="metric-desc" style="font-size: 0.75rem; margin-top: 0.25rem; opacity: 0.8;">Based on
+                            historical patterns of similar disputes</p>
+                    </div>
+                    <div class="disclaimer-box">
+                        <i class="fa-solid fa-circle-info"></i>
+                        <p>This is an AI-generated decision support recommendation. The final outcome is subject to the
+                            review of the adjudicating officer.</p>
+                    </div>
+                    <div class="settlement-box">
+                        <div class="settlement-label">Suggested Settlement Range</div>
+                        <div class="settlement-amount">
+                            <div class="amount-min">
+                                <small>Min</small>
+                                <span id="settleMin"></span>
+                            </div>
+                            <div class="separator">-</div>
+                            <div class="amount-max">
+                                <small>Max</small>
+                                <span id="settleMax"></span>
+                            </div>
+                        </div>
+                        <div class="confidence-bar">
+                            <div class="fill" style="width: 85%"></div>
+                        </div>
+                        <p
+                            style="font-size: 0.75rem; color: hsl(var(--muted-foreground)); text-align: center; margin-top: 0.75rem;">
+                            Range derived from historical settlement ratios for comparable cases.</p>
+                    </div>
+                </div>
+
+                <div class="ai-reasoning-box">
+                    <h3><i class="fa-solid fa-brain"></i> AI Reasoning (simplified)</h3>
+                    <div class="reasoning-grid">
+                        <div class="reasoning-item">
+                            <i class="fa-regular fa-clock"></i>
+                            <div class="reasoning-content">
+                                <span class="reasoning-label">Delay duration</span>
+                                <span class="reasoning-value" id="reasoningDelay"></span>
+                            </div>
+                        </div>
+                        <div class="reasoning-item">
+                            <i class="fa-solid fa-file-circle-check"></i>
+                            <div class="reasoning-content">
+                                <span class="reasoning-label">Document completeness</span>
+                                <span class="reasoning-value" id="reasoningDocScore"></span>
+                            </div>
+                        </div>
+                        <div class="reasoning-item">
+                            <i class="fa-solid fa-indian-rupee-sign"></i>
+                            <div class="reasoning-content">
+                                <span class="reasoning-label">Claim amount</span>
+                                <span class="reasoning-value" id="reasoningClaim"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="deep-analysis-box">
+                    <h3><i class="fa-solid fa-magnifying-glass-chart"></i> Deep Analysis</h3>
+                    <p class="analysis-intro">Understanding the factors that influenced this settlement probability:</p>
+                    <div id="deepAnalysisContent"></div>
+                </div>
+
+                <div class="disclaimer-box">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <p>This is an AI-generated decision support recommendation. The final outcome is subject to the
+                        review of the adjudicating officer.</p>
+                </div>
+
+
+            </div>
+        </main>
+
+        <footer class="app-footer">
+            <p><strong>Disclaimer:</strong> This application is a demonstration for a specific use case and does not
+                represent a binding commitment or legal advice. Historical settlement data is simulated for testing
+                purposes.</p>
+        </footer>
+    </div>
+
+    <script>
+        let currentAnalysisData = null;
+
+        document.getElementById('analysisForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const btn = document.getElementById('analyzeBtn');
+            const btnText = btn.querySelector('.btn-text');
+            const btnLoader = btn.querySelector('.btn-loader');
+            const btnIcon = btn.querySelector('.btn-icon');
+            const resultSection = document.getElementById('resultSection');
+
+            // Show loading state
+            btn.disabled = true;
+            btnText.style.display = 'none';
+            btnIcon.style.display = 'none';
+            btnLoader.style.display = 'inline-flex';
+
+            // Hide previous results
+            resultSection.style.display = 'none';
+
+            // Collect form data
+            const formData = {
+                claim_amount: document.getElementById('claim_amount').value,
+                delay_days: document.getElementById('delay_days').value,
+                document_count: document.getElementById('document_count').value,
+                dispute_type: document.getElementById('dispute_type').value,
+                jurisdiction: document.getElementById('jurisdiction').value
+            };
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Update probability
+                    document.getElementById('probabilityNumber').textContent = data.probability;
+                    document.getElementById('circlePath').setAttribute('stroke-dasharray', `${data.probability}, 100`);
+
+                    // Update priority
+                    const priorityPill = document.getElementById('priorityPill');
+                    priorityPill.className = 'priority-pill ' + data.priority_class;
+                    document.getElementById('priorityText').textContent = data.priority;
+
+                    // Update settlement range
+                    document.getElementById('settleMin').textContent = '₹' + data.settle_min;
+                    document.getElementById('settleMax').textContent = '₹' + data.settle_max;
+
+                    // Update reasoning
+                    document.getElementById('reasoningDelay').textContent = data.delay_days + ' days';
+                    document.getElementById('reasoningDocScore').textContent = data.document_score;
+                    document.getElementById('reasoningClaim').textContent = '₹' + data.claim_amount;
+
+                    // Update deep analysis
+                    const deepAnalysisContent = document.getElementById('deepAnalysisContent');
+                    deepAnalysisContent.innerHTML = '';
+
+                    data.deep_analysis.forEach(item => {
+                        const analysisItem = document.createElement('div');
+                        analysisItem.className = 'analysis-item impact-' + item.impact;
+                        analysisItem.innerHTML = `
+                            <div class="analysis-header">
+                                <div class="analysis-icon">
+                                    <i class="fa-solid ${item.icon}"></i>
+                                </div>
+                                <div class="analysis-title">${item.factor}</div>
+                                <div class="impact-badge ${item.impact}">${item.impact}</div>
+                            </div>
+                            <div class="analysis-description">${item.description}</div>
+                        `;
+                        deepAnalysisContent.appendChild(analysisItem);
+                    });
+
+                    // Store current analysis data for PDF export
+                    currentAnalysisData = {
+                        ...data,
+                        claim_amount: formData.claim_amount,
+                        delay_days: formData.delay_days,
+                        document_count: formData.document_count,
+                        dispute_type: formData.dispute_type,
+                        jurisdiction: formData.jurisdiction
+                    };
+
+                    // Show results with animation
+                    resultSection.style.display = 'block';
+                    setTimeout(() => {
+                        resultSection.classList.add('active');
+                        resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }, 100);
+
+                } else {
+                    alert('Error: ' + data.error);
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while analyzing the case. Please try again.');
+            } finally {
+                // Reset button state
+                btn.disabled = false;
+                btnText.style.display = 'inline';
+                btnIcon.style.display = 'inline';
+                btnLoader.style.display = 'none';
+            }
+        });
+
+        // PDF Export Handler
+        document.getElementById('exportPdfBtn').addEventListener('click', async function () {
+            if (!currentAnalysisData) {
+                alert('Please analyze a case first before exporting.');
+                return;
+            }
+
+            const btn = this;
+            const originalText = btn.innerHTML;
+
+            // Show loading state
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Generating PDF...</span>';
+
+            try {
+                const response = await fetch('/api/export-pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(currentAnalysisData)
+                });
+
+                if (response.ok) {
+                    // Get the blob from response
+                    const blob = await response.blob();
+
+                    // Create download link
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `MSME_Case_Analysis_${new Date().getTime()}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const error = await response.json();
+                    alert('Error generating PDF: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while generating the PDF. Please try again.');
+            } finally {
+                // Reset button state
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        });
+
+        // Settlement Draft Generator Handler
+        document.getElementById('generateSettlementBtn').addEventListener('click', async function () {
+            if (!currentAnalysisData) {
+                alert('Please analyze a case first before generating settlement draft.');
+                return;
+            }
+
+            const btn = this;
+            const originalText = btn.innerHTML;
+
+            // Show loading state
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Generating Draft...</span>';
+
+            try {
+                // Prepare data for settlement draft
+                const settlementData = {
+                    case_id: 'MSME-' + new Date().getFullYear() + '-' + Math.floor(Math.random() * 10000),
+                    dispute_type: currentAnalysisData.dispute_type,
+                    jurisdiction: currentAnalysisData.jurisdiction,
+                    claim_amount: currentAnalysisData.claim_amount.replace(/,/g, ''),
+                    delay_days: currentAnalysisData.delay_days,
+                    document_count: currentAnalysisData.document_count,
+                    probability: currentAnalysisData.probability,
+                    document_score: currentAnalysisData.document_score,
+                    settle_min: currentAnalysisData.settle_min,
+                    settle_max: currentAnalysisData.settle_max
+                };
+
+                const response = await fetch('/api/export-settlement-pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(settlementData)
+                });
+
+                if (response.ok) {
+                    // Get the blob from response
+                    const blob = await response.blob();
+
+                    // Create download link
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Settlement_Draft_${settlementData.case_id}_${new Date().getTime()}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const error = await response.json();
+                    alert('Error generating settlement draft: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while generating the settlement draft. Please try again.');
+            } finally {
+                // Reset button state
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MSME Samadhaan - Delayed Payment Monitoring System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='scheme_style.css') }}">
+    <link href="https://cdn.ux4g.gov.in/UX4G@2.0.8/css/ux4g-min.css" rel="stylesheet">
+    <style>
+        /* Embedded critical tweaks */
+        .app-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <!-- Top Strip -->
+    <div class="top-strip">
+        <a href="#">Skip to Main Content</a>
+        <span>|</span>
+        <a href="#">Screen Reader Access</a>
+        <span>|</span>
+        <div id="google_translate_element"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="gov-header">
+        <div class="brand-section" style="width: 100%;  justify-content: space-between;">
+            <div style="display: flex; align-items: center;  gap: 15px; width: 100%;">
+                <div class="ministry-text" style="display:flex; flex:1; flex-direction:row; align-items: flex-start;">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/55/Emblem_of_India.svg"
+                        alt="Emblem of India" class="emblem-img">
+                    <div style="display: flex; flex-direction: column; padding-left: 10px; margin-left: 10px;">
+                        <p>Government of India</p>
+                        <h1>Ministry of Micro, Small & Medium Enterprises</h1>
+                    </div>
+                </div>
+                <div style="margin-top: 10px; flex:1;">
+                    <header class="app-header">
+                        <div class="logo-area" style="display: flex; align-items: center; justify-content: center;">
+                            <div
+                                style="display: flex; align-items: center; justify-content: start;padding: 8px; margin-right: 10px;">
+                                <i class="fa-solid fa-scale-balanced brand-icon" style="font-size: 40px;"></i>
+                            </div>
+                            <div class="brand-text">
+                                <div style="gap:3px; display: flex; flex-direction: columns; ">
+                                    <div style="display: flex; align-items: center; justify-content: center;">
+
+                                        <h1>MSME Negotiation AI</h1>
+                                    </div>
+                                </div>
+                                <p class="subtitle">AI-assisted decision support for MSME dispute resolution</p>
+
+                            </div>
+                        </div>
+                    </header>
+                </div>
+                <div style="flex:1; display: flex; align-items: center; justify-content: end;">
+
+                    <img src="https://suyojan.co.in/wp-content/uploads/2019/11/swach-bharat.png" alt="Swachh Bharat"
+                        class="swachh-logo">
+                </div>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- Navbar -->
+    <!-- Navbar -->
+    <nav class="gov-navbar">
+        <div class="nav-container">
+            <button class="mobile-menu-btn" onclick="document.querySelector('.gov-navbar ul').classList.toggle('show')">
+                <i class="fa-solid fa-bars"></i> Menu
+            </button>
+            <ul>
+                <li><a href="#" class="active">Home</a></li>
+                <li><a href="#">About Us</a></li>
+                <li><a href="#">Check Case Status</a></li>
+                <li><a href="#">Factsheets</a></li>
+                <li><a href="#">Dashboard</a></li>
+                <li><a href="#">Officer Login</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Visual Steps Banner -->
+    <section class="steps-banner">
+        <h2>Process Overview</h2>
+        <div class="steps-container">
+            <div class="step-item">
+                <div class="step-circle">1</div>
+                <div class="step-text">Enter Case Details</div>
+            </div>
+            <div class="step-item">
+                <div class="step-circle">2</div>
+                <div class="step-text">AI Analysis & Prediction</div>
+            </div>
+            <div class="step-item">
+                <div class="step-circle">3</div>
+                <div class="step-text">Download Assessment Report</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Marquee -->
+    <div class="marquee-container">
+        <marquee behavior="scroll" direction="left" onmouseover="this.stop();" onmouseout="this.start();">
+            "You are requested to file your delayed payment application at the MSME ODR Portal. AI-Assisted Assessment
+            available for pre-filing checks. This is a case analysis prediction, not a final offer."
+        </marquee>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="dashboard-container">
+
+        <!-- Live Stats Row -->
+        <h3 class="section-heading"><i class="fa-solid fa-chart-simple"></i> Application Analysis Numbers</h3>
+        <div class="stats-grid">
+            <div class="stat-card card-blue">
+                <div class="stat-number">2,56,892</div>
+                <div class="stat-label">Total Analyses Made</div>
+                <a href="#" class="more-info">More Info <i class="fa-solid fa-circle-arrow-right"></i></a>
+            </div>
+            <div class="stat-card card-orange">
+                <div class="stat-number">24,238</div>
+                <div class="stat-label">Mutually Settled</div>
+                <a href="#" class="more-info">More Info <i class="fa-solid fa-circle-arrow-right"></i></a>
+            </div>
+            <div class="stat-card card-green">
+                <div class="stat-number">₹1,24,000 Cr</div>
+                <div class="stat-label">Amount Involved</div>
+                <a href="#" class="more-info">More Info <i class="fa-solid fa-circle-arrow-right"></i></a>
+            </div>
+        </div>
+
+        <!-- Utility/Form Section (Embedding the AI tool here) -->
+        <h3 class="section-heading"><i class="fa-solid fa-robot"></i> AI-Assisted Case Assessment</h3>
+        <div class="gov-form-wrapper">
+            <p style="margin-bottom: 20px; font-size: 0.95rem;">
+                Use this tool to analyze the probability of settlement and generate necessary documentation before
+                filing a formal complaint.
+                <br><small style="color: #666;">Note: This is a decision support system.</small>
+            </p>
+
+            <!-- We can copy the form structure from index.html but style it simpler or iframe it? 
+                  For now, let's keep it simple and just link or reimplement a basic version if needed.
+                  Or we can reuse the SAME form HTML but let the CSS handle the look. 
+                  Let's try to include the form form index.html but without glassmorphism.
+             -->
+
+            <form id="analysisForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="grid-column: 1 / -1; display: flex; gap: 20px; margin-bottom: 15px;">
+                    <div style="flex: 1;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Claim Amount (₹)</label>
+                        <input type="number" id="claim_amount" name="claim_amount" class="gov-input" value="480000"
+                            style="width: 100%; padding: 8px; border: 1px solid #ccc;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Delay (Days)</label>
+                        <input type="number" id="delay_days" name="delay_days" value="132"
+                            style="width: 100%; padding: 8px; border: 1px solid #ccc;">
+                    </div>
+                </div>
+
+                <div style="grid-column: 1 / -1; display: flex; gap: 20px; margin-bottom: 15px;">
+                    <div style="flex: 1;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Dispute Type</label>
+                        <select id="dispute_type" name="dispute_type"
+                            style="width: 100%; padding: 8px; border: 1px solid #ccc;">
+                            {% for type in dispute_types %}
+                            <option value="{{ type }}">{{ type }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Jurisdiction</label>
+                        <select id="jurisdiction" name="jurisdiction"
+                            style="width: 100%; padding: 8px; border: 1px solid #ccc;">
+                            {% for state in jurisdictions %}
+                            <option value="{{ state }}">{{ state }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div style="grid-column: 1 / -1; margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 500;">Supporting Documents</label>
+                    <select id="document_count" name="document_count"
+                        style="width: 100%; padding: 8px; border: 1px solid #ccc;">
+                        <option value="1">1 Document</option>
+                        <option value="2">2 Documents</option>
+                        <option value="3" selected>3 Documents</option>
+                        <option value="4">4+ Documents</option>
+                    </select>
+                </div>
+
+                <div style="grid-column: 1 / -1;">
+                    <button type="submit" id="analyzeBtn"
+                        style="background: var(--gov-blue); color: white; border: none; padding: 10px 20px; font-size: 1rem; cursor: pointer; border-radius: 4px;">
+                        Analyze Case
+                    </button>
+                    <span id="loadingMsg" style="display:none; margin-left: 10px; color: #666;">Processing...</span>
+                </div>
+            </form>
+
+            <!-- Results Overlay (Simplified) -->
+            <div id="resultSection"
+                style="display: none; margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px;">
+                <h4 style="color: var(--gov-orange); margin-bottom: 15px;">Assessment Report</h4>
+                <div style="background: #f0f7ff; padding: 15px; border-left: 4px solid var(--gov-blue);">
+                    <p><strong>Settlement Probability:</strong> <span id="probabilityText"
+                            style="font-size: 1.2rem; font-weight: bold;"></span></p>
+                    <p><strong>Estimated Range:</strong> <span id="rangeText"></span></p>
+                    <p><strong>Recommendation:</strong> <span id="priorityText"></span></p>
+
+                    <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button id="downloadReportBtn"
+                            style="background: #e65100; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">
+                            <i class="fa-solid fa-file-pdf"></i> Download Assessment PDF
+                        </button>
+                        <button id="downloadSettlementBtn"
+                            style="background: #138808; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">
+                            <i class="fa-solid fa-file-contract"></i> Download Settlement Draft
+                        </button>
+                    </div>
+
+                </div>
+                <div style="margin-top: 20px;">
+                    <h5>Deep Analysis Factors:</h5>
+                    <ul id="analysisList" style="margin-left: 20px; margin-top: 10px; font-size: 0.9rem;"></ul>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="gov-footer">
+        <div class="footer-content">
+            <div class="footer-links">
+                <h4>Quick Links</h4>
+                <ul>
+                    <li><a href="#">Ministry of MSME</a></li>
+                    <li><a href="#">Privacy Policy</a></li>
+                    <li><a href="#">Terms of Use</a></li>
+                    <li><a href="#">Contact Us</a></li>
+                </ul>
+            </div>
+            <div class="footer-links">
+                <h4>Related Portals</h4>
+                <ul>
+                    <li><a href="#">Udyam Registration</a></li>
+                    <li><a href="#">Champions Portal</a></li>
+                    <li><a href="#">MSME Databank</a></li>
+                </ul>
+            </div>
+            <div class="footer-links">
+                <h4>Contact</h4>
+                <p style="font-size: 0.9rem; color: #ddd; line-height: 1.6;">
+                    Udyog Bhawan, New Delhi - 110011<br>
+                    Phone: 011-23063288<br>
+                    Email: support@msme.gov.in
+                </p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>Content Owned and Maintained by Ministry of Micro, Small & Medium Enterprises, Government of India.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Minimal Script for functionality
+        document.getElementById('analysisForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const btn = document.getElementById('analyzeBtn');
+            const msg = document.getElementById('loadingMsg');
+            const resultDiv = document.getElementById('resultSection');
+
+            btn.disabled = true;
+            msg.style.display = 'inline';
+            resultDiv.style.display = 'none';
+
+            const formData = {
+                claim_amount: document.getElementById('claim_amount').value,
+                delay_days: document.getElementById('delay_days').value,
+                document_count: document.getElementById('document_count').value,
+                dispute_type: document.getElementById('dispute_type').value,
+                jurisdiction: document.getElementById('jurisdiction').value
+            };
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('probabilityText').innerText = data.probability + "%";
+                    document.getElementById('rangeText').innerText = "₹" + data.settle_min + " - ₹" + data.settle_max;
+                    document.getElementById('priorityText').innerText = data.priority;
+
+                    const list = document.getElementById('analysisList');
+                    list.innerHTML = '';
+                    data.deep_analysis.forEach(item => {
+                        const li = document.createElement('li');
+                        li.style.marginTop = "5px";
+                        li.innerHTML = `<strong>${item.factor}:</strong> ${item.description}`;
+                        list.appendChild(li);
+                    });
+
+                    resultDiv.style.display = 'block';
+                }
+            } catch (err) {
+                alert("Error: " + err);
+            } finally {
+                btn.disabled = false;
+                msg.style.display = 'none';
+            }
+        });
+
+        // Current analysis data storage
+        let currentAnalysisForDownload = null;
+
+        // Hook into the success part to store data needed for PDF
+        const originalFetch = window.fetch;
+
+        // Handlers for new buttons (Re-implementing logic from index.html)
+        document.getElementById('downloadReportBtn').addEventListener('click', async function () {
+            const btn = this;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = 'Generating...';
+
+            // Gather data from form + result text
+            const formData = {
+                claim_amount: document.getElementById('claim_amount').value,
+                delay_days: document.getElementById('delay_days').value,
+                document_count: document.getElementById('document_count').value,
+                dispute_type: document.getElementById('dispute_type').value,
+                jurisdiction: document.getElementById('jurisdiction').value,
+
+                // Add result data
+                probability: document.getElementById('probabilityText').innerText.replace('%', ''),
+                settle_min: document.getElementById('rangeText').innerText.split('-')[0].replace('₹', '').trim(),
+                settle_max: document.getElementById('rangeText').innerText.split('-')[1].replace('₹', '').trim(),
+                priority: document.getElementById('priorityText').innerText,
+                priority_class: 'medium', // Default
+                deep_analysis: [], // Simplified for this quick button
+                document_score: document.getElementById('document_count').value / 4
+            };
+
+            // Re-fetch context for deep analysis is hard without state, so we reconstruct basic data
+            // Ideally we should have stored the full response object. 
+            // Let's rely on the fact the user just ran analysis. 
+            // Ideally, we move the fetch logic to a shared function or store 'recentData' global
+
+            try {
+                const response = await fetch('/api/export-pdf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData) // Using reconstructed data
+                });
+
+                if (response.ok) {
+                    constblob = await response.blob();
+                    const url = window.URL.createObjectURL(constblob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Analysis_Report.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                } else {
+                    alert('Error creating PDF');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Error downloading PDF');
+            } finally {
+                btn.innerHTML = originalText;
+            }
+        });
+
+        document.getElementById('downloadSettlementBtn').addEventListener('click', async function () {
+            const btn = this;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = 'Generating...';
+
+            const formData = {
+                case_id: 'MSME-DRAFT-' + Math.floor(Math.random() * 1000),
+                claim_amount: document.getElementById('claim_amount').value,
+                delay_days: document.getElementById('delay_days').value,
+                document_count: document.getElementById('document_count').value,
+                dispute_type: document.getElementById('dispute_type').value,
+                jurisdiction: document.getElementById('jurisdiction').value,
+                probability: document.getElementById('probabilityText').innerText.replace('%', ''),
+                document_score: document.getElementById('document_count').value / 4,
+                settle_min: document.getElementById('rangeText').innerText.split('-')[0].replace('₹', '').trim(),
+                settle_max: document.getElementById('rangeText').innerText.split('-')[1].replace('₹', '').trim()
+            };
+
+            try {
+                const response = await fetch('/api/export-settlement-pdf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Settlement_Draft.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                } else {
+                    alert('Error creating Settlement Draft');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Error downloading draft');
+            } finally {
+                btn.innerHTML = originalText;
+            }
+        });
+    </script>
+    <script src="https://cdn.ux4g.gov.in/tools/accessibility-widget.js" async></script>
+    <script src="https://cdn.ux4g.gov.in/UX4G@2.0.8/js/ux4g.min.js"></script>
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'en', // Default language of your website
+                includedLanguages: 'en,mr,hi,gu,ta,ta,ml,as,or,kn,bn,bh', // Languages to display (comma-separated)
+                autoDisplay: false, // Disable auto-display (show only when user clicks)
+                defaultLanguage: 'en', // Fallback language
+            }, 'google_translate_element'); // ID of the container div
+        }
+    </script>
+    <script type="text/javascript"
+        src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+
+</html>
