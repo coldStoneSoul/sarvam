@@ -1,7 +1,7 @@
 import os
 from typing import Optional, Dict, Any
 from openai import OpenAI
-
+import json
 
 class TextProcessor:
     """
@@ -15,7 +15,7 @@ class TextProcessor:
     def __init__(
         self, 
         api_key: Optional[str] = None, 
-        model: str = "docker.io/granite-4.0-nano:350M-BF16",
+        model: str = "ai/granite-4.0-micro",
         base_url: Optional[str] = None
     ):
         """
@@ -30,7 +30,7 @@ class TextProcessor:
         self.api_key = api_key or os.getenv("OPENAI_API_KEY") or "not-needed"
         
         # Default to Docker Model Runner URL if not specified
-        self.base_url = base_url or os.getenv("MODEL_RUNNER_URL", "http://localhost:8080/v1")
+        self.base_url = base_url or os.getenv("MODEL_RUNNER_URL", "http://localhost:12434/v1")
         
         # Initialize OpenAI client with custom base URL for Docker Model Runner
         self.client = OpenAI(
@@ -184,8 +184,48 @@ class TextProcessor:
             
         except Exception as e:
             raise RuntimeError(f"Failed to perform custom analysis: {str(e)}")
+    
 
-
+    # Case detauls 
+    def extract_case_details(self, text: str) -> Dict[str, Any]:
+        """Extracts specific legal/dispute fields for the XGBoost model."""
+        system_prompt = (
+            "You are a legal data extractor. Extract the following fields from the text "
+            "and return ONLY a valid JSON object. Fields: case_id, claim_amount, delay_days, "
+            "document_count, dispute_type, jurisdiction, probability (Low/Medium/High), "
+            "document_score (0-10), settle_min, settle_max."
+        )
+        
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model, # Using micro as requested
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": text}
+                ],
+                response_format={ "type": "json_object" }
+            )
+            return json.loads(response.choices[0].message.content)
+        except Exception as e:
+            raise RuntimeError(f"Extraction failed: {str(e)}")
+        
+    def draft_settlement(self, text: str, outcome_data: Dict) -> str:
+        """Drafts a settlement based on document text and XGBoost predictions."""
+        prompt = f"""
+        Based on the following document text and the predicted outcome data, draft a 
+        professional settlement proposal. Include specific clauses and reference 
+        the probability rate.
+        
+        Outcome Data: {json.dumps(outcome_data)}
+        """
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "You are a senior legal counsel drafting a settlement agreement."},
+                {"role": "user", "content": f"{prompt}\n\nDocument Text:\n{text}"}
+            ]
+        )
+        return response.choices[0].message.content
 # Convenience function for quick summarization
 def quick_summarize(
     text: str, 

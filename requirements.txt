@@ -1,4 +1,4 @@
 docling
 flask
 pyyaml
-openai
+openaik

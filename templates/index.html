@@ -1,442 +1,350 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Docling Converter</title>
+    <title>MSME Samadhaan - Delayed Payment Monitoring System</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+        <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='scheme_style.css') }}"
+    />
+    <link
+      href="https://cdn.ux4g.gov.in/UX4G@2.0.8/css/ux4g-min.css"
+      rel="stylesheet"
+    />
+    <style>
+      /* Embedded critical tweaks */
+      .app-container {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+    </style>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-top-color: currentColor;
-            border-radius: 50%;
-            animation: spin 0.6s linear infinite;
+      .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: currentColor;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
         }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+      }
     </style>
-</head>
-<body>
-
-
-<div class="bg-indigo-600 text-white py-6 px-4 text-center">
-    <h1 class="text-3xl font-bold">🔗 Docling Converter</h1>
-    <p class="text-base opacity-90 mt-1">Convert documents to Markdown, JSON, or YAML</p>
-</div>
-
-<div class="max-w-3xl mx-auto mt-8 px-2">
-    <!-- Upload Card -->
-    <div class="bg-white border border-gray-200 rounded-xl shadow p-8 mb-6">
-        <h2 class="text-lg font-semibold flex items-center gap-2 mb-5">📄 Upload Documents</h2>
-        <div id="dropzone" class="border-2 border-dashed border-gray-300 rounded-xl py-10 px-2 text-center cursor-pointer transition hover:border-indigo-500 hover:bg-indigo-50">
-            <div class="text-4xl mb-2">📁</div>
-            <p class="text-gray-500 text-sm">Drag & drop files here, or <span class="font-semibold">click to browse</span></p>
-            <p class="text-xs text-slate-400 mt-1">Supported: PDF, DOCX, HTML, PPTX, Images, AsciiDoc, Markdown • Max 20 MB each • Multiple files OK</p>
-            <input type="file" id="fileInput" multiple accept=".pdf,.docx,.html,.htm,.pptx,.png,.jpg,.jpeg,.asciidoc,.md" class="hidden" />
-        </div>
-        <div id="fileList" style="display:none; margin-top:.75rem;"></div>
+  </head>
+  <body>
+    <!-- Top Strip -->
+    <div class="top-strip">
+      <a href="#">Skip to Main Content</a>
+      <span>|</span>
+      <a href="#">Screen Reader Access</a>
+      <span>|</span>
+      <div id="google_translate_element"></div>
     </div>
 
-    <!-- Settings Card -->
-    <div class="bg-white border border-gray-200 rounded-xl shadow p-8 mb-6">
-        <h2 class="text-lg font-semibold flex items-center gap-2 mb-5">⚙️ Settings</h2>
-        <div class="mb-4">
-            <label class="block font-semibold mb-1">Output Format</label>
-            <div class="flex gap-4 flex-wrap">
-                <label class="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:border-indigo-500">
-                    <input type="radio" name="output_format" value="markdown" checked class="accent-indigo-600" />
-                    <span>Markdown</span>
-                </label>
-                <label class="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:border-indigo-500">
-                    <input type="radio" name="output_format" value="json" class="accent-indigo-600" />
-                    <span>JSON</span>
-                </label>
-                <label class="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:border-indigo-500">
-                    <input type="radio" name="output_format" value="yaml" class="accent-indigo-600" />
-                    <span>YAML</span>
-                </label>
+    <!-- Header -->
+    <header class="gov-header sticky top-0 z-50 border-b">
+      <div
+        class="brand-section"
+        style="width: 100%; justify-content: space-between"
+      >
+        <div style="display: flex; align-items: center; gap: 15px; width: 100%">
+          <div
+            class="ministry-text"
+            style="
+              display: flex;
+              flex: 1;
+              flex-direction: row;
+              align-items: flex-start;
+            "
+          >
+            <img
+              src="https://freesvg.org/img/Indian-Flag2.png"
+              alt="National Flag of India"
+              class="emblem-img"
+            />
+            <div
+              style="
+                display: flex;
+                flex-direction: column;
+                padding-left: 10px;
+                margin-left: 10px;
+              "
+            >
+              <p>From SarvamX for</p>
+              <h1>Ministry of Micro, Small & Medium Enterprises</h1>
             </div>
+          </div>
+          <div style="margin-top: 10px; flex: 1">
+            <header class="app-header">
+              <div
+                class="logo-area"
+                style="
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: start;
+                    padding: 8px;
+                    margin-right: 10px;
+                  "
+                >
+                  <i
+                    class="fa-solid fa-scale-balanced brand-icon"
+                    style="font-size: 40px"
+                  ></i>
+                </div>
+                <div class="brand-text">
+                  <div style="gap: 3px; display: flex; flex-direction: columns">
+                    <div
+                      style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                      "
+                    >
+                      <h1>MSME Negotiation AI</h1>
+                    </div>
+                  </div>
+                  <p class="subtitle">
+                    AI-assisted decision support for MSME dispute resolution
+                  </p>
+                </div>
+              </div>
+            </header>
+          </div>
+          <div
+            style="
+              flex: 1;
+              display: flex;
+              align-items: center;
+              justify-content: end;
+            "
+          >
+            <img
+              src="https://brandlogovector.com/wp-content/uploads/2020/08/Make-in-India-Logo-Small.png"
+              alt="Swachh Bharat"
+              class="swachh-logo"
+            />
+            <img
+              src="https://suyojan.co.in/wp-content/uploads/2019/11/swach-bharat.png"
+              alt="Swachh Bharat"
+              class="swachh-logo"
+            />
+          </div>
         </div>
-        <div>
-            <label class="flex items-center gap-2 cursor-pointer font-medium">
-                <input type="checkbox" id="useOcr" checked class="accent-indigo-600 w-4 h-4" />
-                Enable OCR (for scanned PDFs & images)
-            </label>
-        </div>
+      </div>
+    </header>
+
+    <!-- Navbar -->
+    <nav class="gov-navbar sticky top-20 z-40  border-t border-b">
+      <div class="nav-container">
+        <button
+          class="mobile-menu-btn"
+          onclick="
+            document.querySelector('.gov-navbar ul').classList.toggle('show')
+          "
+        >
+          <i class="fa-solid fa-bars"></i> Menu
+        </button>
+        <ul>
+          <li><a href="#" class="active">Home</a></li>
+          <li><a href="/schema">Direct Input</a></li>
+        </ul>
+      </div>
+    </nav>
+    <!-- Marquee -->
+    <div class="marquee-container">
+      <marquee
+        behavior="scroll"
+        direction="left"
+        onmouseover="this.stop()"
+        onmouseout="this.start()"
+      >
+        "You are requested to file your delayed payment application at the MSME
+        ODR Portal. AI-Assisted Assessment available for pre-filing checks. This
+        is a case analysis prediction, not a final offer."
+      </marquee>
     </div>
 
-    <!-- Convert Button -->
-    <button class="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed text-base mb-4" id="convertBtn" disabled>
-        🚀 Convert Documents
-    </button>
+    <div class="mt-8 px-2">
+      <div id="layoutContainer" class="flex flex-col max-w-3xl mx-auto">
+        <!-- Left Column: Upload Section -->
+        <div id="uploadSection" class="flex-1 min-w-0">
+          <!-- Upload Card -->
+          <div class="bg-white border border-gray-200 rounded-xl shadow p-8 mb-6">
+            <h2 class="text-lg font-semibold flex items-center gap-2 mb-5">
+              📄 Upload Documents
+            </h2>
+            <div
+              id="dropzone"
+              class="border-2 border-dashed border-gray-300 rounded-xl py-10 px-2 text-center cursor-pointer transition hover:border-indigo-500 hover:bg-indigo-50"
+            >
+              <div class="text-4xl mb-2">📁</div>
+              <p class="text-gray-500 text-sm">
+                Drag & drop files here, or
+                <span class="font-semibold">click to browse</span>
+              </p>
+              <p class="text-xs text-slate-400 mt-1">
+                Supported: PDF, DOCX, HTML, PPTX, Images, AsciiDoc, Markdown • Max
+                20 MB each • Multiple files OK
+              </p>
+              <input
+                type="file"
+                id="fileInput"
+                multiple
+                accept=".pdf,.docx,.html,.htm,.pptx,.png,.jpg,.jpeg,.asciidoc,.md"
+                class="hidden"
+              />
+            </div>
+            <div id="fileList" style="display: none; margin-top: 0.75rem"></div>
+          </div>
 
-    <!-- Summarize Button -->
-    <button class="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-purple-600 hover:bg-purple-700 text-base mb-4" id="summarizeBtn">
-        📝 Summarize Text
-    </button>
+          <!-- Convert Button -->
+          <button
+            class="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed text-base mb-4"
+            id="convertBtn"
+            disabled
+          >
+            Analyis Case
+          </button>
 
-    <!-- Status -->
-    <div id="status" class="hidden"></div>
+          <!-- Status -->
+          <div id="status" class="hidden"></div>
+        </div>
 
-    <!-- Results container for multiple files -->
-    <div id="resultsContainer"></div>
-</div>
+        <!-- Right Column: Results Container (Hidden by default) -->
+        <div id="resultsSection" class="hidden flex-1 min-w-0 lg:max-h-[80vh] lg:overflow-y-auto">
+          <div id="resultsContainer"></div>
+        </div>
+      </div>
+    </div>
 
-<div class="text-center py-6 text-sm text-slate-400">
-    Built with Flask & Docling •
-    <a href="https://github.com/hparreao" target="_blank" class="text-indigo-600 hover:underline">GitHub</a>
-</div>
-
-<!-- Summarize Modal -->
-<div id="summarizeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col">
+    <div
+      id="chatSidebar"
+      class="fixed right-0 top-0 h-full w-130 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-50 flex flex-col border-l"
+    >
+      <div
+        class="p-4 bg-indigo-600 text-white flex justify-between items-center"
+      >
+        <h3 class="font-bold">Chat with Doc</h3>
+        <button onclick="toggleChat()" class="text-xl">&times;</button>
+      </div>
+      <div
+        id="chatMessages"
+        class="flex-1 overflow-y-auto p-4 space-y-3 text-sm"
+      ></div>
+      <div class="p-4 border-t">
+        <input
+          type="text"
+          id="chatInput"
+          class="w-full border rounded-lg px-3 py-2"
+          placeholder="Ask about this doc..."
+        />
+        <button
+          id="sendChat"
+          class="mt-2 w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed"
+        >send</button>
+      </div>
+    </div>
+    <!-- Summarize Modal -->
+    <div
+      id="summarizeModal"
+      class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+    >
+      <div
+        class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col"
+      >
         <div class="flex justify-between items-center p-6 border-b">
-            <h2 class="text-xl font-bold text-gray-800">📝 Summarize Text</h2>
-            <button id="closeModal" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+          <h2 class="text-xl font-bold text-gray-800">📝 Summarize Text</h2>
+          <button
+            id="closeModal"
+            class="text-gray-400 hover:text-gray-600 text-2xl"
+          >
+            &times;
+          </button>
         </div>
         <div class="p-6 overflow-y-auto flex-1">
-            <label class="block font-semibold mb-2 text-gray-700">Enter text to summarize:</label>
-            <textarea id="textInput" class="w-full h-40 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none" placeholder="Paste or type your text here..."></textarea>
-            
-            <div id="summaryResult" class="hidden mt-4">
-                <label class="block font-semibold mb-2 text-gray-700">Summary:</label>
-                <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-gray-800" id="summaryContent"></div>
-            </div>
-            
-            <div id="summaryStatus" class="hidden mt-3"></div>
+          <label class="block font-semibold mb-2 text-gray-700"
+            >Enter text to summarize:</label
+          >
+          <textarea
+            id="textInput"
+            class="w-full h-40 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+            placeholder="Paste or type your text here..."
+          ></textarea>
+
+          <div id="summaryResult" class="hidden mt-4">
+            <label class="block font-semibold mb-2 text-gray-700"
+              >Summary:</label
+            >
+            <div
+              class="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-gray-800"
+              id="summaryContent"
+            ></div>
+          </div>
+
+          <div id="summaryStatus" class="hidden mt-3"></div>
         </div>
         <div class="p-6 border-t flex gap-3 justify-end">
-            <button id="cancelBtn" class="px-5 py-2 rounded-lg font-semibold text-gray-700 bg-gray-200 hover:bg-gray-300">Cancel</button>
-            <button id="submitSummary" class="px-5 py-2 rounded-lg font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed">Generate Summary</button>
+          <button
+            id="cancelBtn"
+            class="px-5 py-2 rounded-lg font-semibold text-gray-700 bg-gray-200 hover:bg-gray-300"
+          >
+            Cancel
+          </button>
+          <button
+            id="submitSummary"
+            class="px-5 py-2 rounded-lg font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed"
+          >
+            Generate Summary
+          </button>
         </div>
+      </div>
     </div>
-</div>
-
-<script>
-const dropzone      = document.getElementById('dropzone');
-const fileInput     = document.getElementById('fileInput');
-const fileListEl    = document.getElementById('fileList');
-const convertBtn    = document.getElementById('convertBtn');
-const statusEl      = document.getElementById('status');
-const resultsEl     = document.getElementById('resultsContainer');
-
-let selectedFiles = [];  // Array of File objects
-let conversionResults = [];  // Store conversion results for summarization
-
-/* ---- Drop zone ---- */
-dropzone.addEventListener('click', () => fileInput.click());
-dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
-dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
-dropzone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropzone.classList.remove('dragover');
-    if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
-});
-fileInput.addEventListener('change', () => {
-    if (fileInput.files.length) addFiles(fileInput.files);
-    fileInput.value = '';  // allow re-selecting same files
-});
-
-function addFiles(fileListObj) {
-    for (const f of fileListObj) {
-        // avoid duplicates by name+size
-        if (!selectedFiles.some(s => s.name === f.name && s.size === f.size)) {
-            selectedFiles.push(f);
-        }
-    }
-    renderFileList();
-}
-
-function removeFile(idx) {
-    selectedFiles.splice(idx, 1);
-    renderFileList();
-}
-
-function clearAllFiles() {
-    selectedFiles = [];
-    renderFileList();
-}
-
-function renderFileList() {
-    if (selectedFiles.length === 0) {
-        fileListEl.style.display = 'none';
-        dropzone.style.display = 'block';
-        convertBtn.disabled = true;
-        return;
-    }
-    dropzone.style.display = 'block';
-    fileListEl.style.display = 'block';
-    convertBtn.disabled = false;
-
-    const totalSize = selectedFiles.reduce((a, f) => a + f.size, 0);
-    let html = `<div class="flex justify-between items-center mb-2 text-sm">
-        <span><span class="font-semibold">${selectedFiles.length}</span> file${selectedFiles.length > 1 ? 's' : ''} selected
-        <span class="text-slate-400">(${(totalSize / 1024 / 1024).toFixed(2)} MB total)</span></span>
-        <button class="text-red-500 hover:underline text-xs font-semibold" onclick="clearAllFiles()">✕ Clear all</button>
-    </div>`;
-    selectedFiles.forEach((f, i) => {
-        html += `<div class="flex items-center gap-2 border border-gray-200 rounded-md px-3 py-2 mb-1 bg-slate-50 text-sm">
-            <span>📎</span>
-            <span class="flex-1 truncate" title="${f.name}">${f.name}</span>
-            <span class="text-slate-400">${(f.size / 1024 / 1024).toFixed(2)} MB</span>
-            <button class="text-red-500 font-bold px-2" onclick="removeFile(${i})">✕</button>
-        </div>`;
-    });
-    fileListEl.innerHTML = html;
-}
-
-function hideResults() {
-    statusEl.className = 'status';
-    resultsEl.innerHTML = '';
-}
-
-function showStatus(type, msg) {
-    statusEl.className = `block rounded-lg px-4 py-3 mt-2 text-base font-medium` +
-        (type === 'loading' ? ' bg-indigo-50 text-indigo-700' :
-         type === 'success' ? ' bg-green-50 text-green-700' :
-         type === 'error'   ? ' bg-red-50 text-red-700' : '');
-    statusEl.innerHTML = msg;
-}
-
-/* ---- Convert ---- */
-convertBtn.addEventListener('click', async () => {
-    if (selectedFiles.length === 0) return;
-
-    const format = document.querySelector('input[name="output_format"]:checked').value;
-    const useOcr = document.getElementById('useOcr').checked;
-
-    convertBtn.disabled = true;
-    hideResults();
-
-    const count = selectedFiles.length;
-    const isBatch = count > 1;
-
-    if (isBatch) {
-        /* ---------- Batch conversion ---------- */
-        showStatus('loading',
-            `<span class="spinner"></span> Converting ${count} documents… this may take a while.`);
-
-        const formData = new FormData();
-        selectedFiles.forEach(f => formData.append('files[]', f));
-        formData.append('output_format', format);
-        formData.append('use_ocr', useOcr ? 'true' : 'false');
-
-        try {
-            const resp = await fetch('/api/convert/batch', { method: 'POST', body: formData });
-            if (!resp.ok) {
-                const err = await resp.json();
-                throw new Error(err.error || 'Batch conversion failed');
-            }
-            const data = await resp.json();
-            const ok = data.results.filter(r => r.success).length;
-            const fail = data.results.filter(r => !r.success).length;
-
-            showStatus('success',
-                `✅ Done! ${ok} succeeded${fail ? `, ${fail} failed` : ''} out of ${data.total} files.`);
-
-            renderBatchResults(data.results);
-        } catch (err) {
-            showStatus('error', `❌ Error: ${err.message}`);
-        }
-    } else {
-        /* ---------- Single file ---------- */
-        showStatus('loading',
-            '<span class="spinner"></span> Converting document… this may take a moment.');
-
-        const formData = new FormData();
-        formData.append('file', selectedFiles[0]);
-        formData.append('output_format', format);
-        formData.append('use_ocr', useOcr ? 'true' : 'false');
-
-        try {
-            const resp = await fetch('/api/convert?inline=true', { method: 'POST', body: formData });
-            if (!resp.ok) {
-                const err = await resp.json();
-                throw new Error(err.error || 'Conversion failed');
-            }
-            const data = await resp.json();
-            showStatus('success', '✅ Conversion completed successfully!');
-            renderBatchResults([{
-                success: true,
-                original_filename: selectedFiles[0].name,
-                filename: data.filename,
-                format: data.format,
-                content: data.content,
-            }]);
-        } catch (err) {
-            showStatus('error', `❌ Error: ${err.message}`);
-        }
-    }
-
-    convertBtn.disabled = false;
-});
-
-/* ---- Render results ---- */
-function renderBatchResults(results) {
-    conversionResults = results;  // Store results for summarization
-    let html = '';
-    results.forEach((r, i) => {
-        if (r.success) {
-            const preview = typeof r.content === 'string' ? r.content : JSON.stringify(r.content, null, 2);
-            const blob = new Blob([preview], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-
-            html += `<div class="bg-white border-l-4 border-green-500 shadow rounded-lg p-6 mb-4">
-                <div class="flex flex-wrap justify-between items-center mb-2 gap-2">
-                    <h3 class="font-semibold text-green-700 text-base">✅ ${r.original_filename} → ${r.filename}</h3>
-                    <div class="flex gap-2">
-                        <button class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold" onclick="togglePreview(${i})">👁️ Preview</button>
-                        <button class="px-3 py-1 rounded bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold" onclick="summarizeExtractedText(${i})">📝 Summarize</button>
-                        <a class="px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-white text-xs font-semibold" href="${url}" download="${r.filename}">⬇️ Download</a>
-                    </div>
-                </div>
-                <div class="bg-slate-50 border border-slate-200 rounded p-3 mt-2 text-xs font-mono max-h-60 overflow-auto hidden" id="preview-${i}">${escapeHtml(preview)}</div>
-                <div class="hidden mt-3" id="summary-container-${i}"></div>
-            </div>`;
-        } else {
-            html += `<div class="bg-white border-l-4 border-red-500 shadow rounded-lg p-6 mb-4">
-                <div class="flex justify-between items-center mb-2">
-                    <h3 class="font-semibold text-red-700 text-base">❌ ${r.original_filename}</h3>
-                </div>
-                <p class="text-red-600 text-xs">${escapeHtml(r.error)}</p>
-            </div>`;
-        }
-    });
-    resultsEl.innerHTML = html;
-}
-
-function togglePreview(idx) {
-    const el = document.getElementById(`preview-${idx}`);
-    if (el) el.classList.toggle('hidden');
-}
-
-async function summarizeExtractedText(idx) {
-    const result = conversionResults[idx];
-    if (!result || !result.success) return;
-    
-    const text = typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2);
-    const container = document.getElementById(`summary-container-${idx}`);
-    
-    if (!container) return;
-    
-    // Show loading state
-    container.classList.remove('hidden');
-    container.innerHTML = `<div class="bg-indigo-50 text-indigo-700 rounded-lg px-4 py-3 text-sm font-medium">
-        <span class="spinner"></span> Generating summary from extracted text...
-    </div>`;
-    
-    try {
-        const resp = await fetch('/api/summarize-text', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, max_tokens: 500, temperature: 0.7 })
-        });
-        
-        if (!resp.ok) {
-            const err = await resp.json();
-            throw new Error(err.error || 'Summarization failed');
-        }
-        
-        const data = await resp.json();
-        container.innerHTML = `<div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
-            <div class="flex items-center gap-2 font-semibold text-purple-800 mb-2">
-                <span>📝</span>
-                <span>AI Summary</span>
-            </div>
-            <div class="text-sm text-gray-800 leading-relaxed">${escapeHtml(data.summary)}</div>
-            <div class="text-xs text-gray-500 mt-2">Model: ${data.metadata.model} • Tokens: ${data.metadata.tokens_used.total}</div>
-        </div>`;
-    } catch (err) {
-        container.innerHTML = `<div class="bg-red-50 text-red-700 rounded-lg px-4 py-3 text-sm font-medium">
-            ❌ Error: ${escapeHtml(err.message)}
-        </div>`;
-    }
-}
-
-function escapeHtml(str) {
-    const d = document.createElement('div');
-    d.textContent = str;
-    return d.innerHTML;
-}
-
-/* ---- Summarize Modal ---- */
-const summarizeBtn = document.getElementById('summarizeBtn');
-const summarizeModal = document.getElementById('summarizeModal');
-const closeModal = document.getElementById('closeModal');
-const cancelBtn = document.getElementById('cancelBtn');
-const submitSummary = document.getElementById('submitSummary');
-const textInput = document.getElementById('textInput');
-const summaryResult = document.getElementById('summaryResult');
-const summaryContent = document.getElementById('summaryContent');
-const summaryStatus = document.getElementById('summaryStatus');
-
-// Open modal
-summarizeBtn.addEventListener('click', () => {
-    summarizeModal.classList.remove('hidden');
-    textInput.value = '';
-    summaryResult.classList.add('hidden');
-    summaryStatus.classList.add('hidden');
-});
-
-// Close modal functions
-function closeModalFunc() {
-    summarizeModal.classList.add('hidden');
-}
-closeModal.addEventListener('click', closeModalFunc);
-cancelBtn.addEventListener('click', closeModalFunc);
-
-// Close on backdrop click
-summarizeModal.addEventListener('click', (e) => {
-    if (e.target === summarizeModal) closeModalFunc();
-});
-
-// Submit for summary
-submitSummary.addEventListener('click', async () => {
-    const text = textInput.value.trim();
-    if (!text) {
-        showSummaryStatus('error', '⚠️ Please enter some text to summarize.');
-        return;
-    }
-
-    submitSummary.disabled = true;
-    summaryResult.classList.add('hidden');
-    showSummaryStatus('loading', '<span class="spinner"></span> Generating summary...');
-
-    try {
-        const resp = await fetch('/api/summarize-text', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text })
-        });
-        
-        if (!resp.ok) {
-            const err = await resp.json();
-            throw new Error(err.error || 'Summarization failed');
-        }
-        
-        const data = await resp.json();
-        summaryContent.textContent = data.summary;
-        summaryResult.classList.remove('hidden');
-        showSummaryStatus('success', '✅ Summary generated successfully!');
-    } catch (err) {
-        showSummaryStatus('error', `❌ Error: ${err.message}`);
-    }
-    
-    submitSummary.disabled = false;
-});
-
-function showSummaryStatus(type, msg) {
-    summaryStatus.className = `block rounded-lg px-4 py-3 text-sm font-medium` +
-        (type === 'loading' ? ' bg-indigo-50 text-indigo-700' :
-         type === 'success' ? ' bg-green-50 text-green-700' :
-         type === 'error'   ? ' bg-red-50 text-red-700' : '');
-    summaryStatus.innerHTML = msg;
-    summaryStatus.classList.remove('hidden');
-}
-</script>
-</body>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script
+      src="https://cdn.ux4g.gov.in/tools/accessibility-widget.js"
+      async
+    ></script>
+    <script src="https://cdn.ux4g.gov.in/UX4G@2.0.8/js/ux4g.min.js"></script>
+    <script type="text/javascript">
+      function googleTranslateElementInit() {
+        new google.translate.TranslateElement(
+          {
+            pageLanguage: "en", // Default language of your website
+            includedLanguages: "en,mr,hi,gu,ta,ta,ml,as,or,kn,bn,bh", // Languages to display (comma-separated)
+            autoDisplay: false, // Disable auto-display (show only when user clicks)
+            defaultLanguage: "en", // Fallback language
+          },
+          "google_translate_element",
+        ); // ID of the container div
+      }
+    </script>
+    <script
+      type="text/javascript"
+      src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
+    ></script>
+  </body>
 </html>

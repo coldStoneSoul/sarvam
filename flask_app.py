@@ -132,7 +132,13 @@ def index():
 # ---------------------------------------------------------------------------
 # API routes
 # ---------------------------------------------------------------------------
+@app.route("/api/ping", methods=["GET"])
+def api_ping():
+    return jsonify({"success": True, "message": "pong"})
 
+@app.route("/schema", methods=["GET"])
+def scheme():
+    return render_template('scheme.html')
 @app.route("/api/convert", methods=["POST"])
 def api_convert():
     """
@@ -487,7 +493,51 @@ def api_analyze():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/analyze-case", methods=["POST"])
+def api_analyze_case():
+    """Converts doc, extracts features, runs prediction, and drafts settlement."""
+    if "file" not in request.files:
+        return jsonify({"error": "No file"}), 400
+    
+    uploaded = request.files["file"]
+    file_bytes = uploaded.read()
+    result = convert_document(file_bytes, uploaded.filename, True)
+    text_content = result.document.export_to_markdown()
+    
+    processor = TextProcessor()
+    # 1. Extract Features
+    case_data = processor.extract_case_details(text_content)
+    
+    # 2. Mock XGBoost Call (Replace with your model.predict)
+    # prediction = my_xgboost_model.predict(case_data)
+    prediction_outcome = {"predicted_win_rate": "74%", "risk_level": "Low"}
+    
+    # 3. Draft Settlement
+    draft = processor.draft_settlement(text_content, {**case_data, **prediction_outcome})
+    
+    return jsonify({
+        "case_data": case_data,
+        "prediction": prediction_outcome,
+        "settlement_draft": draft,
+        "text_content": text_content
+    })
 
+@app.route("/api/chat", methods=["POST"])
+def api_chat():
+    """Chat specifically about the provided document context."""
+    data = request.json
+    doc_text = data.get("context")
+    user_query = data.get("message")
+    
+    processor = TextProcessor()
+    response = processor.client.chat.completions.create(
+        model="ai/granite-4.0-micro",
+        messages=[
+            {"role": "system", "content": f"Answer based ONLY on this document:\n{doc_text}"},
+            {"role": "user", "content": user_query}
+        ]
+    )
+    return jsonify({"response": response.choices[0].message.content})
 # ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
