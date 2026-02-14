@@ -191,9 +191,18 @@ class TextProcessor:
         """Extracts specific legal/dispute fields for the XGBoost model."""
         system_prompt = (
             "You are a legal data extractor. Extract the following fields from the text "
-            "and return ONLY a valid JSON object. Fields: case_id, claim_amount, delay_days, "
-            "document_count, dispute_type, jurisdiction, probability (Low/Medium/High), "
-            "document_score (0-10), settle_min, settle_max."
+            "and return ONLY a valid JSON object. Fields: \n"
+            "- case_id (string)\n"
+            "- claim_amount (integer, NO commas, NO currency symbols)\n"
+            "- delay_days (integer)\n"
+            "- document_count (integer)\n"
+            "- dispute_type (string, one of: goods_rejection, service_non_payment, invoice_non_payment, short_payment, interest_on_delay, others)\n"
+            "- jurisdiction (string, standard State name in Title Case)\n"
+            "- probability (Low/Medium/High)\n"
+            "- document_score (0-10)\n"
+            "- settle_min (integer, NO commas)\n"
+            "- settle_max (integer, NO commas)\n"
+            "IMPORTANT: Return raw integers for amounts and days. Do not include 'Rs.', commas, or text."
         )
         
         try:

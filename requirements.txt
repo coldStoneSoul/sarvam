@@ -2,3 +2,4 @@ docling
 flask
 pyyaml
 openaik
+reportlab

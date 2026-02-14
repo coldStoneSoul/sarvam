@@ -1,3 +1,7 @@
 .venv
 venv
 __pycache__
+/uploads
+/results
+*.log
+services/__pycache__

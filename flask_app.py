@@ -7,37 +7,32 @@ from pathlib import Path
 from typing import Dict, List
 from dataclasses import dataclass, field
 
-from flask import Flask, request, jsonify, render_template, send_file, abort
-from docling.datamodel.pipeline_options import PdfPipelineOptions
-from docling.document_converter import (
-    DocumentConverter,
-    PdfFormatOption,
-    WordFormatOption,
-)
-from docling.datamodel.base_models import DocumentStream, InputFormat
-from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
-from docling.pipeline.simple_pipeline import SimplePipeline
-from docling.pipeline.standard_pdf_pipeline import StandardPdfPipeline
+from flask import Flask, request, jsonify, render_template, send_file, abort, make_response
+from datetime import datetime
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+# Import modular services
 from textprocessor import TextProcessor
+from config import config
+from services.prediction import (
+    run_xgb_prediction,
+    generate_settlement_draft_text,
+    dispute_types,
+    jurisdictions,
+)
+from services.document import convert_document
+
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 print("starting Flask app setup tests...")
-@dataclass
-class AppConfig:
-    SUPPORTED_EXTENSIONS: List[str] = field(default_factory=lambda: [
-        "pdf", "docx", "html", "htm", "pptx",
-        "png", "jpg", "jpeg", "asciidoc", "md",
-    ])
-    OUTPUT_FORMATS: List[str] = field(default_factory=lambda: ["markdown", "json", "yaml"])
-    MAX_PAGES: int = 100
-    MAX_FILE_SIZE: int = 20_971_520  # 20 MB
-    UPLOAD_FOLDER: str = "uploads"
-    RESULT_FOLDER: str = "results"
 
-
-config = AppConfig()
 
 # ---------------------------------------------------------------------------
 # Flask setup
@@ -49,53 +44,7 @@ app.config["MAX_CONTENT_LENGTH"] = config.MAX_FILE_SIZE * 10  # allow batch uplo
 os.makedirs(config.UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(config.RESULT_FOLDER, exist_ok=True)
 
-# ---------------------------------------------------------------------------
-# Docling converter (singleton-ish)
-# ---------------------------------------------------------------------------
 
-_converters: Dict[bool, DocumentConverter] = {}
-
-
-def get_converter(use_ocr: bool = True) -> DocumentConverter:
-    if use_ocr not in _converters:
-        pipeline_options = PdfPipelineOptions(
-            do_ocr=use_ocr,
-            do_table_structure=False,
-        )
-        _converters[use_ocr] = DocumentConverter(
-            allowed_formats=[
-                InputFormat.PDF,
-                InputFormat.IMAGE,
-                InputFormat.DOCX,
-                InputFormat.HTML,
-                InputFormat.PPTX,
-                InputFormat.ASCIIDOC,
-                InputFormat.MD,
-            ],
-            format_options={
-                InputFormat.PDF: PdfFormatOption(
-                    pipeline_cls=StandardPdfPipeline,
-                    backend=PyPdfiumDocumentBackend,
-                    pipeline_options=pipeline_options,
-                ),
-                InputFormat.DOCX: WordFormatOption(pipeline_cls=SimplePipeline),
-                InputFormat.HTML: WordFormatOption(),
-                InputFormat.PPTX: WordFormatOption(),
-            },
-        )
-    return _converters[use_ocr]
-
-
-def convert_document(file_bytes: bytes, filename: str, use_ocr: bool = True):
-    converter = get_converter(use_ocr)
-    buf = BytesIO(file_bytes)
-    source = DocumentStream(name=filename, stream=buf)
-    result = converter.convert(
-        source,
-        max_num_pages=config.MAX_PAGES,
-        max_file_size=config.MAX_FILE_SIZE,
-    )
-    return result
 
 
 def format_output(result, output_format: str):
@@ -126,6 +75,8 @@ def index():
         "index.html",
         supported_extensions=config.SUPPORTED_EXTENSIONS,
         output_formats=config.OUTPUT_FORMATS,
+        dispute_types=dispute_types,
+        jurisdictions=jurisdictions,
     )
 
 
@@ -138,7 +89,7 @@ def api_ping():
 
 @app.route("/schema", methods=["GET"])
 def scheme():
-    return render_template('scheme.html')
+    return render_template('scheme.html', dispute_types=dispute_types, jurisdictions=jurisdictions)
 @app.route("/api/convert", methods=["POST"])
 def api_convert():
     """
@@ -498,29 +449,136 @@ def api_analyze_case():
     """Converts doc, extracts features, runs prediction, and drafts settlement."""
     if "file" not in request.files:
         return jsonify({"error": "No file"}), 400
-    
+
     uploaded = request.files["file"]
     file_bytes = uploaded.read()
     result = convert_document(file_bytes, uploaded.filename, True)
     text_content = result.document.export_to_markdown()
-    
+
     processor = TextProcessor()
-    # 1. Extract Features
     case_data = processor.extract_case_details(text_content)
-    
-    # 2. Mock XGBoost Call (Replace with your model.predict)
-    # prediction = my_xgboost_model.predict(case_data)
-    prediction_outcome = {"predicted_win_rate": "74%", "risk_level": "Low"}
-    
-    # 3. Draft Settlement
-    draft = processor.draft_settlement(text_content, {**case_data, **prediction_outcome})
-    
+
+    # Real XGBoost prediction
+    try:
+        prediction = run_xgb_prediction(
+            claim_amount=int(case_data.get("claim_amount") or 100000),
+            delay_days=int(case_data.get("delay_days") or 100),
+            document_count=int(case_data.get("document_count") or 1),
+            dispute_type=case_data.get("dispute_type") or dispute_types[0],
+            jurisdiction=case_data.get("jurisdiction") or jurisdictions[0],
+        )
+    except Exception:
+        prediction = {"probability": 50.0, "priority": "Medium", "priority_class": "medium",
+                      "settle_min": "70,000", "settle_max": "85,000", "deep_analysis": [], "success": True,
+                      "document_score": 0.25, "delay_days": 100, "claim_amount": "100,000"}
+
+    draft = processor.draft_settlement(text_content, {**case_data, **prediction})
+
     return jsonify({
         "case_data": case_data,
-        "prediction": prediction_outcome,
+        "prediction": prediction,
         "settlement_draft": draft,
-        "text_content": text_content
+        "text_content": text_content,
     })
+
+
+def clean_number(val):
+    """Remove non-numeric characters from string and return int."""
+    if isinstance(val, (int, float)):
+        return int(val)
+    if not val:
+        return 0
+    # Remove currency symbols, commas, spaces
+    clean = ''.join(c for c in str(val) if c.isdigit() or c == '.')
+    try:
+        return int(float(clean))
+    except ValueError:
+        return 0
+
+@app.route("/api/extract-fields", methods=["POST"])
+def api_extract_fields():
+    """Upload a doc, run OCR, extract case fields for user review."""
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    uploaded = request.files["file"]
+    if uploaded.filename == "":
+        return jsonify({"error": "Empty filename"}), 400
+
+    try:
+        file_bytes = uploaded.read()
+        result = convert_document(file_bytes, uploaded.filename, True)
+        text_content = result.document.export_to_markdown()
+
+        processor = TextProcessor()
+        fields = processor.extract_case_details(text_content)
+
+        # Normalise — ensure the frontend always gets usable values
+        dispute_type = fields.get("dispute_type", "").lower()
+        # Fallback to 'others' if not in strict list (or check loose match)
+        if dispute_type not in dispute_types:
+             # Try to match if it's close or use others
+             dispute_type = "others" if dispute_type not in dispute_types else dispute_type
+
+        return jsonify({
+            "success": True,
+            "text_content": text_content,
+            "fields": {
+                "claim_amount": clean_number(fields.get("claim_amount")),
+                "delay_days": clean_number(fields.get("delay_days")),
+                "document_count": clean_number(fields.get("document_count")),
+                "dispute_type": dispute_type or dispute_types[0],
+                "jurisdiction": fields.get("jurisdiction") or jurisdictions[0],
+            },
+            "dispute_types": dispute_types,
+            "jurisdictions": jurisdictions,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/predict", methods=["POST"])
+def api_predict():
+    """Run XGBoost prediction on user-edited fields."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    try:
+        claim_amount = int(data["claim_amount"])
+        delay_days = int(data["delay_days"])
+        document_count = int(data["document_count"])
+        dt = data["dispute_type"]
+        jur = data["jurisdiction"]
+
+        result = run_xgb_prediction(claim_amount, delay_days, document_count, dt, jur)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+@app.route("/api/generate-draft", methods=["POST"])
+def api_generate_draft():
+    """Generate settlement draft via LLM + rule-based template."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    try:
+        text_content = data.get("text_content", "")
+        case_info = data.get("case_data", {})
+        prediction = data.get("prediction", {})
+
+        # Rule-based draft
+        rule_draft = generate_settlement_draft_text({**case_info, **prediction})
+
+        # LLM draft
+        processor = TextProcessor()
+        llm_draft = processor.draft_settlement(text_content, {**case_info, **prediction})
+
+        return jsonify({"success": True, "rule_draft": rule_draft, "llm_draft": llm_draft})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
@@ -538,6 +596,251 @@ def api_chat():
         ]
     )
     return jsonify({"response": response.choices[0].message.content})
+
+
+@app.route("/api/export-pdf", methods=["POST"])
+def export_pdf():
+    """Export analysis report as PDF."""
+    try:
+        data = request.get_json()
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'],
+            fontSize=24, textColor=colors.HexColor('#667eea'), spaceAfter=30,
+            alignment=TA_CENTER, fontName='Helvetica-Bold')
+        heading_style = ParagraphStyle('CustomHeading', parent=styles['Heading2'],
+            fontSize=14, textColor=colors.HexColor('#333333'), spaceAfter=12,
+            spaceBefore=20, fontName='Helvetica-Bold')
+        normal_style = ParagraphStyle('CustomNormal', parent=styles['Normal'],
+            fontSize=10, textColor=colors.HexColor('#666666'), spaceAfter=6)
+
+        elements.append(Paragraph("MSME Case Analysis Report", title_style))
+        elements.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", normal_style))
+        elements.append(Spacer(1, 0.3*inch))
+
+        # Case Details
+        elements.append(Paragraph("Case Details", heading_style))
+        case_table_data = [
+            ['Claim Amount:', f"₹{data.get('claim_amount', 'N/A')}"],
+            ['Payment Delay:', f"{data.get('delay_days', 'N/A')} days"],
+            ['Documents:', f"{data.get('document_count', 'N/A')} documents"],
+            ['Document Score:', f"{data.get('document_score', 'N/A')}"],
+            ['Dispute Type:', data.get('dispute_type', 'N/A')],
+            ['Jurisdiction:', data.get('jurisdiction', 'N/A')]
+        ]
+        t = Table(case_table_data, colWidths=[2.5*inch, 4*inch])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f0f0f0')),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
+        ]))
+        elements.append(t)
+        elements.append(Spacer(1, 0.3*inch))
+
+        # Assessment Results
+        elements.append(Paragraph("AI Assessment Results", heading_style))
+        results_data = [
+            ['Settlement Probability:', f"{data.get('probability', 'N/A')}%"],
+            ['Priority Level:', data.get('priority', 'N/A')],
+            ['Settlement Range:', f"₹{data.get('settle_min', 'N/A')} - ₹{data.get('settle_max', 'N/A')}"]
+        ]
+        rt = Table(results_data, colWidths=[2.5*inch, 4*inch])
+        rt.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f0f0f0')),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
+        ]))
+        elements.append(rt)
+        elements.append(Spacer(1, 0.3*inch))
+
+        # Deep Analysis
+        elements.append(Paragraph("Deep Analysis", heading_style))
+        for item in data.get('deep_analysis', []):
+            sym = '✓' if item['impact'] == 'positive' else '!' if item['impact'] == 'negative' else '○'
+            elements.append(Paragraph(f"<b>{sym} {item['factor']}</b>", normal_style))
+            desc_style = ParagraphStyle('Desc', parent=normal_style, leftIndent=20, spaceAfter=12)
+            elements.append(Paragraph(item['description'], desc_style))
+
+        elements.append(Spacer(1, 0.3*inch))
+        disclaimer_style = ParagraphStyle('Disclaimer', parent=normal_style, fontSize=9,
+            textColor=colors.HexColor('#0d47a1'), leftIndent=10, rightIndent=10,
+            borderColor=colors.HexColor('#2196F3'), borderWidth=1, borderPadding=10,
+            backColor=colors.HexColor('#e7f3ff'))
+        elements.append(Paragraph(
+            "⚠ This is an AI-generated decision support recommendation. The final outcome is subject to the review of the adjudicating officer.",
+            disclaimer_style))
+
+        doc.build(elements)
+        pdf_data = buffer.getvalue()
+        buffer.close()
+
+        response = make_response(pdf_data)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=MSME_Case_Analysis_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+        return response
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route("/api/export-settlement-pdf", methods=["POST"])
+def export_settlement_pdf():
+    """Export settlement draft as PDF."""
+    try:
+        data = request.get_json()
+        draft_text = generate_settlement_draft_text(data)
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4,
+            topMargin=0.75*inch, bottomMargin=0.75*inch,
+            leftMargin=0.75*inch, rightMargin=0.75*inch)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        title_style = ParagraphStyle('SettlementTitle', parent=styles['Heading1'],
+            fontSize=16, textColor=colors.HexColor('#1a1a1a'), spaceAfter=6,
+            alignment=TA_CENTER, fontName='Helvetica-Bold')
+        subtitle_style = ParagraphStyle('SettlementSubtitle', parent=styles['Normal'],
+            fontSize=11, textColor=colors.HexColor('#555555'), spaceAfter=20,
+            alignment=TA_CENTER, fontName='Helvetica')
+        section_heading_style = ParagraphStyle('SectionHeading', parent=styles['Heading2'],
+            fontSize=13, textColor=colors.HexColor('#2c3e50'), spaceAfter=8,
+            spaceBefore=15, fontName='Helvetica-Bold')
+        body_style = ParagraphStyle('SettlementBody', parent=styles['Normal'],
+            fontSize=10, textColor=colors.HexColor('#333333'), spaceAfter=8,
+            leading=14, fontName='Helvetica')
+        disclaimer_style = ParagraphStyle('SettlementDisclaimer', parent=styles['Normal'],
+            fontSize=9, textColor=colors.HexColor('#555555'), spaceAfter=6,
+            leading=12, fontName='Helvetica-Oblique', leftIndent=10, rightIndent=10,
+            borderColor=colors.HexColor('#cccccc'), borderWidth=1, borderPadding=10,
+            backColor=colors.HexColor('#f9f9f9'))
+
+        for line in draft_text.split('\n'):
+            if not line.strip():
+                elements.append(Spacer(1, 0.1*inch))
+            elif line.startswith('ASSISTED SETTLEMENT DRAFT'):
+                elements.append(Paragraph(line, title_style))
+            elif line.startswith('(Generated by'):
+                elements.append(Paragraph(line, subtitle_style))
+            elif line.startswith('This draft is generated to assist'):
+                elements.append(Paragraph(line, body_style))
+            elif line.startswith('Final terms are subject'):
+                elements.append(Paragraph(line, body_style))
+                elements.append(Spacer(1, 0.2*inch))
+            elif line.startswith('='):
+                elements.append(Spacer(1, 0.15*inch))
+            elif line.startswith('-'):
+                pass
+            elif line.strip().isupper() and len(line.strip()) > 5:
+                elements.append(Paragraph(line.strip(), section_heading_style))
+            elif line.startswith('This draft is generated as an AI'):
+                elements.append(Paragraph(line, disclaimer_style))
+            elif line.startswith('It does not constitute'):
+                elements.append(Paragraph(line, disclaimer_style))
+            elif line.startswith('All final decisions'):
+                elements.append(Paragraph(line, disclaimer_style))
+            elif line.startswith('by the designated authority'):
+                elements.append(Paragraph(line, disclaimer_style))
+            else:
+                elements.append(Paragraph(line, body_style))
+
+        doc.build(elements)
+        pdf_data = buffer.getvalue()
+        buffer.close()
+
+        response = make_response(pdf_data)
+        response.headers['Content-Type'] = 'application/pdf'
+        case_id = data.get('case_id', 'Draft')
+        response.headers['Content-Disposition'] = f'attachment; filename=Settlement_Draft_{case_id}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+        return response
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route("/api/export-ai-draft-pdf", methods=["POST"])
+def export_ai_draft_pdf():
+    """Export AI-generated settlement draft as PDF."""
+    try:
+        data = request.get_json()
+        draft_text = data.get("draft_text", "")
+        if not draft_text.strip():
+            return jsonify({"success": False, "error": "No draft text provided"}), 400
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4,
+            topMargin=0.75*inch, bottomMargin=0.75*inch,
+            leftMargin=0.75*inch, rightMargin=0.75*inch)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        title_style = ParagraphStyle('AIDraftTitle', parent=styles['Heading1'],
+            fontSize=18, textColor=colors.HexColor('#1a1a1a'), spaceAfter=6,
+            alignment=TA_CENTER, fontName='Helvetica-Bold')
+        subtitle_style = ParagraphStyle('AIDraftSubtitle', parent=styles['Normal'],
+            fontSize=10, textColor=colors.HexColor('#555555'), spaceAfter=20,
+            alignment=TA_CENTER, fontName='Helvetica')
+        section_style = ParagraphStyle('AIDraftSection', parent=styles['Heading2'],
+            fontSize=13, textColor=colors.HexColor('#2c3e50'), spaceAfter=8,
+            spaceBefore=15, fontName='Helvetica-Bold')
+        body_style = ParagraphStyle('AIDraftBody', parent=styles['Normal'],
+            fontSize=10, textColor=colors.HexColor('#333333'), spaceAfter=6,
+            leading=14, fontName='Helvetica')
+        disclaimer_style = ParagraphStyle('AIDraftDisclaimer', parent=styles['Normal'],
+            fontSize=9, textColor=colors.HexColor('#0d47a1'), leftIndent=10,
+            rightIndent=10, borderColor=colors.HexColor('#2196F3'),
+            borderWidth=1, borderPadding=10, backColor=colors.HexColor('#e7f3ff'))
+
+        elements.append(Paragraph("AI-Generated Settlement Draft", title_style))
+        elements.append(Paragraph(
+            f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", subtitle_style))
+        elements.append(Spacer(1, 0.2*inch))
+
+        # Parse the draft text into paragraphs
+        for line in draft_text.split('\n'):
+            stripped = line.strip()
+            if not stripped:
+                elements.append(Spacer(1, 0.08*inch))
+            elif stripped.startswith('##'):
+                elements.append(Paragraph(stripped.lstrip('#').strip(), section_style))
+            elif stripped.startswith('#'):
+                elements.append(Paragraph(stripped.lstrip('#').strip(), section_style))
+            elif stripped.startswith('---') or stripped.startswith('==='):
+                elements.append(Spacer(1, 0.1*inch))
+            elif stripped.startswith('**') and stripped.endswith('**'):
+                elements.append(Paragraph(f"<b>{stripped.strip('*')}</b>", body_style))
+            else:
+                # Escape XML special chars for ReportLab
+                safe = stripped.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                elements.append(Paragraph(safe, body_style))
+
+        elements.append(Spacer(1, 0.3*inch))
+        elements.append(Paragraph(
+            "⚠ This is an AI-generated settlement draft. It does not constitute legal advice. "
+            "Final terms are subject to mutual consent and approval by the adjudicating authority.",
+            disclaimer_style))
+
+        doc.build(elements)
+        pdf_data = buffer.getvalue()
+        buffer.close()
+
+        response = make_response(pdf_data)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = (
+            f'attachment; filename=AI_Settlement_Draft_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf')
+        return response
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
 # ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
