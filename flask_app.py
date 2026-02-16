@@ -509,7 +509,9 @@ def api_extract_fields():
         file_bytes = uploaded.read()
         result = convert_document(file_bytes, uploaded.filename, True)
         text_content = result.document.export_to_markdown()
+        print("text_content",text_content)
 
+        #here we are passing those to llm
         processor = TextProcessor()
         fields = processor.extract_case_details(text_content)
 

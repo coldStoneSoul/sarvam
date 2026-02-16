@@ -93,102 +93,119 @@ def load_or_train_model():
 load_or_train_model()
 
 
-def generate_deep_analysis(claim_amount, delay_days, document_count, document_score,
-                           dispute_type, jurisdiction, probability, feature_importance):
+def generate_deep_analysis(
+    claim_amount,
+    delay_days,
+    document_count,
+    document_score,
+    dispute_type,
+    jurisdiction,
+    probability,
+    feature_contribution,
+    optimal_threshold=0.607
+):
     analysis = []
-    # Analyze delay days impact
-    if delay_days < 100:
-        analysis.append({
-            'factor': 'Payment Delay', 'impact': 'positive', 'icon': 'fa-check-circle',
-            'description': f'Short delay period ({delay_days} days) increases settlement likelihood. Disputes with delays under 100 days typically see faster resolution.'
-        })
-    elif delay_days < 300:
-        analysis.append({
-            'factor': 'Payment Delay', 'impact': 'neutral', 'icon': 'fa-minus-circle',
-            'description': f'Moderate delay period ({delay_days} days). This is within typical negotiation timeframes but may require careful handling.'
-        })
-    else:
-        analysis.append({
-            'factor': 'Payment Delay', 'impact': 'negative', 'icon': 'fa-exclamation-circle',
-            'description': f'Extended delay period ({delay_days} days) may complicate settlement. Longer delays often correlate with reduced settlement probability.'
-        })
-    
-    # Analyze document completeness
-    if document_score >= 0.75:
-        analysis.append({
-            'factor': 'Documentation', 'impact': 'positive', 'icon': 'fa-check-circle',
-            'description': f'Strong documentation ({document_count} documents, {document_score:.2f} score). Comprehensive evidence significantly improves settlement chances.'
-        })
-    elif document_score >= 0.5:
-        analysis.append({
-            'factor': 'Documentation', 'impact': 'neutral', 'icon': 'fa-minus-circle',
-            'description': f'Adequate documentation ({document_count} documents, {document_score:.2f} score). Consider gathering additional supporting evidence if available.'
-        })
-    else:
-        analysis.append({
-            'factor': 'Documentation', 'impact': 'negative', 'icon': 'fa-exclamation-circle',
-            'description': f'Limited documentation ({document_count} documents, {document_score:.2f} score). Insufficient evidence may weaken negotiating position.'
-        })
-    
-    # Analyze claim amount
-    if claim_amount < 200000:
-        analysis.append({
-            'factor': 'Claim Amount', 'impact': 'positive', 'icon': 'fa-check-circle',
-            'description': f'Lower claim amount (₹{claim_amount:,}) typically facilitates faster settlements with higher success rates.'
-        })
-    elif claim_amount < 1000000:
-        analysis.append({
-            'factor': 'Claim Amount', 'impact': 'neutral', 'icon': 'fa-minus-circle',
-            'description': f'Medium claim amount (₹{claim_amount:,}). Requires balanced negotiation approach between parties.'
-        })
-    else:
-        analysis.append({
-            'factor': 'Claim Amount', 'impact': 'negative', 'icon': 'fa-exclamation-circle',
-            'description': f'High claim amount (₹{claim_amount:,}) may require more extensive negotiation and review processes.'
-        })
-    
-    # Analyze dispute type
+
+    def interpret_feature(name, display_name, icon):
+        contrib = feature_contribution.get(name, 0)
+
+        if contrib > 0:
+            impact = "positive"
+            description = (
+                f"{display_name} positively influenced settlement likelihood "
+                f"(model contribution: +{contrib:.3f})."
+            )
+        elif contrib < 0:
+            impact = "negative"
+            description = (
+                f"{display_name} reduced settlement likelihood "
+                f"(model contribution: {contrib:.3f})."
+            )
+        else:
+            impact = "neutral"
+            description = (
+                f"{display_name} had minimal influence on the model prediction."
+            )
+
+        return {
+            "factor": display_name,
+            "impact": impact,
+            "icon": icon,
+            "description": description
+        }
+
+    # Model-aligned explanations
+    analysis.append(
+        interpret_feature("delay_days", "Payment Delay", "fa-clock")
+    )
+
+    analysis.append(
+        interpret_feature("document_count", "Documentation Strength", "fa-file-lines")
+    )
+
+    analysis.append(
+        interpret_feature("claim_amount", "Claim Amount", "fa-indian-rupee-sign")
+    )
+
+    analysis.append(
+        interpret_feature("dispute_type_enc", "Dispute Category", "fa-gavel")
+    )
+
+    analysis.append(
+        interpret_feature("jurisdiction_enc", "Jurisdiction Influence", "fa-map-location-dot")
+    )
+
+    # Add contextual narrative (UX layer)
     analysis.append({
-        'factor': 'Dispute Type', 'impact': 'neutral', 'icon': 'fa-gavel',
-        'description': f'Case classified as "{dispute_type}". Historical data for this dispute category has been factored into the analysis.'
+        "factor": "Case Context",
+        "impact": "neutral",
+        "icon": "fa-circle-info",
+        "description": (
+            f"The case involves a claim of ₹{claim_amount:,} "
+            f"with a delay of {delay_days} days and "
+            f"{document_count} supporting documents "
+            f"(completeness score: {document_score:.2f})."
+        )
     })
-    
-    # Analyze jurisdiction
-    analysis.append({
-        'factor': 'Jurisdiction', 'impact': 'neutral', 'icon': 'fa-map-location-dot',
-        'description': f'Case jurisdiction: {jurisdiction}. Regional patterns and precedents have been considered in this assessment.'
-    })
-    
-    # Overall recommendation
-    if probability > 0.6:
+
+    # Overall Assessment based on optimized threshold
+    if probability >= optimal_threshold:
         analysis.append({
-            'factor': 'Overall Assessment', 'impact': 'positive', 'icon': 'fa-thumbs-up',
-            'description': 'Strong indicators suggest high settlement potential. Recommend prioritizing this case for negotiation.'
-        })
-    elif probability > 0.3:
-        analysis.append({
-            'factor': 'Overall Assessment', 'impact': 'neutral', 'icon': 'fa-balance-scale',
-            'description': 'Mixed indicators suggest moderate settlement potential. Careful evaluation and strategic negotiation recommended.'
+            "factor": "Overall Assessment",
+            "impact": "positive",
+            "icon": "fa-thumbs-up",
+            "description": (
+                f"Predicted settlement probability is {probability:.2%}, "
+                f"which exceeds the decision threshold ({optimal_threshold:.2f}). "
+                f"The model indicates strong settlement potential."
+            )
         })
     else:
         analysis.append({
-            'factor': 'Overall Assessment', 'impact': 'negative', 'icon': 'fa-exclamation-triangle',
-            'description': 'Current indicators suggest challenges in reaching settlement. Consider alternative dispute resolution mechanisms.'
+            "factor": "Overall Assessment",
+            "impact": "negative",
+            "icon": "fa-exclamation-triangle",
+            "description": (
+                f"Predicted settlement probability is {probability:.2%}, "
+                f"below the decision threshold ({optimal_threshold:.2f}). "
+                f"The model indicates lower likelihood of settlement."
+            )
         })
-    
+
     return analysis
 
 
+OPTIMAL_THRESHOLD = 0.607
+
 def run_xgb_prediction(claim_amount, delay_days, document_count, dispute_type, jurisdiction):
     """Run XGBoost prediction and return full results dict."""
+
     document_score = document_count / 4
-    
-    # Check if encoders are fitted (should be by load_or_train_model)
+
     try:
         dispute_enc_val = int(dispute_encoder.transform([dispute_type])[0])
         jurisdiction_enc_val = int(state_encoder.transform([jurisdiction])[0])
     except Exception as e:
-        # Fallback if unknown category
         print(f"Encoder error: {e}. Using defaults.")
         dispute_enc_val = 0
         jurisdiction_enc_val = 0
@@ -201,37 +218,56 @@ def run_xgb_prediction(claim_amount, delay_days, document_count, dispute_type, j
         "dispute_type_enc": [dispute_enc_val],
         "jurisdiction_enc": [jurisdiction_enc_val],
     }
+
     final_data = pd.DataFrame(input_dict, columns=FEATURES)
+
+    # ---- MODEL PREDICTION ----
     probability = float(xgb_model.predict_proba(final_data)[0][1])
 
-    if document_count >= 4:
-        probability = min(probability * 1.25, 0.95)
-    elif document_count == 3:
-        probability = min(probability * 1.15, 0.95)
+    # ---- CLASS DECISION USING OPTIMAL THRESHOLD ----
+    prediction = 1 if probability >= OPTIMAL_THRESHOLD else 0
 
-    feature_importance = xgb_model.feature_importances_
-
-    if probability > 0.6:
+    if prediction == 1:
         priority, priority_class = "High Settlement Likelihood", "high"
-    elif probability > 0.3:
-        priority, priority_class = "Medium Settlement Likelihood", "medium"
     else:
         priority, priority_class = "Lower Settlement Likelihood", "low"
 
+    # ---- SETTLEMENT RANGE (independent of classification) ----
     base_min, base_max = 0.70, 0.85
     doc_boost_min = document_score * 0.15
     doc_boost_max = document_score * 0.08
     settle_min = int(claim_amount * (base_min + doc_boost_min))
     settle_max = int(claim_amount * (base_max + doc_boost_max))
 
+    # ---- FEATURE CONTRIBUTIONS ----
+    import xgboost as xgb
+
+    dmat = xgb.DMatrix(final_data)
+    contrib = xgb_model.get_booster().predict(dmat, pred_contribs=True)[0]
+
+    feature_contribution = {
+        feature: float(value)
+        for feature, value in zip(FEATURES + ["bias"], contrib)
+    }
+
+    # ---- GENERATE EXPLAINABLE ANALYSIS ----
     deep_analysis = generate_deep_analysis(
-        claim_amount, delay_days, document_count, document_score,
-        dispute_type, jurisdiction, probability, feature_importance,
+        claim_amount,
+        delay_days,
+        document_count,
+        document_score,
+        dispute_type,
+        jurisdiction,
+        probability,
+        feature_contribution,
+        optimal_threshold=OPTIMAL_THRESHOLD
     )
 
     return {
         "success": True,
-        "probability": round(float(probability * 100), 2),
+        "probability": round(probability * 100, 2),
+        "prediction": prediction,
+        "threshold": OPTIMAL_THRESHOLD,
         "priority": priority,
         "priority_class": priority_class,
         "settle_min": f"{settle_min:,}",
@@ -239,6 +275,7 @@ def run_xgb_prediction(claim_amount, delay_days, document_count, dispute_type, j
         "delay_days": int(delay_days),
         "document_score": float(document_score),
         "claim_amount": f"{claim_amount:,}",
+        "feature_contribution": feature_contribution,
         "deep_analysis": deep_analysis,
     }
 

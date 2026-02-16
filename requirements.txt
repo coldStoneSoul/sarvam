@@ -1,5 +1,5 @@
 docling
 flask
 pyyaml
-openaik
+openai
 reportlab

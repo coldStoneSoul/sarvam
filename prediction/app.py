@@ -52,6 +52,9 @@ model = XGBClassifier(
     random_state=42
 )
 model.fit(X, y)
+joblib.dump(model, "xgb_model.pkl")
+joblib.dump(dispute_encoder, "dispute_encoder.pkl")
+joblib.dump(state_encoder, "state_encoder.pkl")
 
 # model = joblib.load("xgb_model.pkl")
 # dispute_encoder = joblib.load("dispute_encoder.pkl")
@@ -766,4 +769,4 @@ def export_settlement_pdf():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True , port=5005)

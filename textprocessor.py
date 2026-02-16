@@ -190,19 +190,49 @@ class TextProcessor:
     def extract_case_details(self, text: str) -> Dict[str, Any]:
         """Extracts specific legal/dispute fields for the XGBoost model."""
         system_prompt = (
-            "You are a legal data extractor. Extract the following fields from the text "
-            "and return ONLY a valid JSON object. Fields: \n"
-            "- case_id (string)\n"
-            "- claim_amount (integer, NO commas, NO currency symbols)\n"
-            "- delay_days (integer)\n"
-            "- document_count (integer)\n"
+            "Role: You are a high-precision Legal & Financial Data Extractor."
+            "Task: Extract required fields from the input text and return ONLY a valid JSON object. Follow the specific logic rules for financial calculations and entity recognition."
+            "Execution Logic Rules:"
+            "- claim_amount: If a specific disputed amount is not stated, calculate it based on contract clauses. Return raw integers only. No commas, no currency symbols."
+            "- document_count: Increment this for every distinct record, report, or evidence mentioned (e.g., Invoice, SLA Extract, Incident Report, Log, Email)."
+            "- jurisdiction: Extract or infer the Indian State in Title Case based on city or office locations mentioned."
+            "- dispute_type: Use 'others' for quality/SLA disputes; 'service_non_payment' only if the work was accepted but unpaid."
+            "- delay_days: Extract the number of days mentioned for outages, late deliveries, or payment delays."
+            "Fields:"
+            "- is_legal_case (boolean)"
+            "- case_id (string)"
+            "- claim_amount (integer)"
+            "- delay_days (integer)"
+            "- document_count (integer)"
             "- dispute_type (string, one of: goods_rejection, service_non_payment, invoice_non_payment, short_payment, interest_on_delay, others)\n"
-            "- jurisdiction (string, standard State name in Title Case)\n"
-            "- probability (Low/Medium/High)\n"
-            "- document_score (0-10)\n"
-            "- settle_min (integer, NO commas)\n"
-            "- settle_max (integer, NO commas)\n"
-            "IMPORTANT: Return raw integers for amounts and days. Do not include 'Rs.', commas, or text."
+            "- jurisdiction (string, standard Indian State name in Title Case)"
+            "- document_score (integer 0-10)"
+            "- clarify (string: single sentence explaining the logic used for the extracted values)"
+            "- confidence_level (integer 0-10)"
+            "Constraint: Return ONLY the JSON object. Do NOT include extra text, explanations, or markdown outside the JSON."
+        )
+        validator_prompt = (
+            "Role: You are a Strict Data Auditor. Your job is to find errors in the extracted data."
+            "Input: You will receive Source Text and an Extracted JSON object."
+            "Task: Compare the Extracted JSON against the Source Text. verification steps:"
+            "1. Check if 'claim_amount' matches the text or contract logic exactly. Recalculate if necessary."
+            "2. Verify 'delay_days' calculation. partial days should be rounded up."
+            "3. Confirm 'dispute_type' is strictly one of the allowed enum values."
+            "4. Ensure 'jurisdiction' is a valid Indian State."
+            "Output: Return a JSON object with the corrected fields and a 'corrections_made' list explaining any changes."
+            "Constraint: Return ONLY the JSON object. Do NOT include extra text, explanations, or markdown outside the JSON."
+            "Fields to return:"
+            "- is_legal_case (boolean)"
+            "- case_id (string)"
+            "- claim_amount (integer)"
+            "- delay_days (integer)"
+            "- document_count (integer)"
+            "- dispute_type (string, one of: goods_rejection, service_non_payment, invoice_non_payment, short_payment, interest_on_delay, others)\n"
+            "- jurisdiction (string, standard Indian State name in Title Case)"
+            "- document_score (integer 0-10)"
+            "- clarify (string: logic why extracted values are correct or wrong)"
+            "- is_passed"
+            "Constraint: Return ONLY the JSON object. Do NOT include extra text, explanations, or markdown outside the JSON."
         )
         
         try:
@@ -214,7 +244,20 @@ class TextProcessor:
                 ],
                 response_format={ "type": "json_object" }
             )
-            return json.loads(response.choices[0].message.content)
+            print("response",response.choices[0].message.content)
+
+            # Updated to use client.chat instead of invalid client.think
+            validate = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role" : "system" , "content":validator_prompt},
+                    {"role" : "user" , "content": f"Source Text:\n{text}\n\nExtracted JSON:\n{response.choices[0].message.content}"}
+                ],
+                temperature=0.1, # Lower temperature for stricter auditing
+                response_format={ "type": "json_object" }
+            )
+            print("validate",validate.choices[0].message.content)
+            return json.loads(validate.choices[0].message.content)
         except Exception as e:
             raise RuntimeError(f"Extraction failed: {str(e)}")
         
