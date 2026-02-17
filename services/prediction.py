@@ -4,7 +4,12 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from xgboost import XGBClassifier
-
+from services.audit import AuditLogger
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+sentiment_analyzer = SentimentIntensityAnalyzer()
+# Initialize Audit Logger
+audit_logger = AuditLogger()
+import xgboost as xgb
 # Get absolute path to the data file
 # ../prediction/msme_synthetic_cases.json relative to this file
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -239,8 +244,6 @@ def run_xgb_prediction(claim_amount, delay_days, document_count, dispute_type, j
     settle_min = int(claim_amount * (base_min + doc_boost_min))
     settle_max = int(claim_amount * (base_max + doc_boost_max))
 
-    # ---- FEATURE CONTRIBUTIONS ----
-    import xgboost as xgb
 
     dmat = xgb.DMatrix(final_data)
     contrib = xgb_model.get_booster().predict(dmat, pred_contribs=True)[0]
@@ -262,6 +265,38 @@ def run_xgb_prediction(claim_amount, delay_days, document_count, dispute_type, j
         feature_contribution,
         optimal_threshold=OPTIMAL_THRESHOLD
     )
+    negotiation_strategy = generate_negotiation_strategy(
+    probability,
+    claim_amount,
+    document_score,
+    delay_days,
+    feature_contribution
+)
+
+
+    # ---- AUDIT LOGGING ----
+    try:
+        audit_inputs = {
+            "claim_amount": claim_amount,
+            "delay_days": delay_days,
+            "document_count": document_count,
+            "dispute_type": dispute_type,
+            "jurisdiction": jurisdiction
+        }
+        
+        audit_result = {
+            "probability": probability,
+            "prediction": prediction,
+            "threshold": OPTIMAL_THRESHOLD
+        }
+        
+        # Log the prediction
+        case_id = audit_logger.log_prediction(audit_inputs, audit_result)
+        print(f"Prediction logged with Case ID: {case_id}")
+        
+    except Exception as e:
+        print(f"Error logging prediction: {e}")
+        case_id = None
 
     return {
         "success": True,
@@ -277,8 +312,95 @@ def run_xgb_prediction(claim_amount, delay_days, document_count, dispute_type, j
         "claim_amount": f"{claim_amount:,}",
         "feature_contribution": feature_contribution,
         "deep_analysis": deep_analysis,
+        "case_id": case_id,
+        "negotiation_strategy": negotiation_strategy
+
+    }
+def generate_negotiation_strategy(
+    probability,
+    claim_amount,
+    document_score,
+    delay_days,
+    feature_contribution,
+    counterparty_text=None
+):
+    strategy = {}
+
+    # ---- Determine Zone ----
+    if probability >= 0.75:
+        zone = "Aggressive"
+        opening_ratio = 0.92
+    elif probability >= 0.60:
+        zone = "Strong"
+        opening_ratio = 0.85
+    elif probability >= 0.40:
+        zone = "Balanced"
+        opening_ratio = 0.78
+    else:
+        zone = "Defensive"
+        opening_ratio = 0.68
+
+    # ---- Sentiment Adjustment ----
+    sentiment_label = "neutral"
+    sentiment_score = 0
+
+    if counterparty_text:
+        sentiment_label, sentiment_score = analyze_sentiment(counterparty_text)
+
+        if sentiment_label == "positive":
+            opening_ratio += 0.03
+        elif sentiment_label == "negative":
+            opening_ratio -= 0.05
+
+    opening_ratio = min(max(opening_ratio, 0.60), 0.95)
+    opening_offer = int(claim_amount * opening_ratio)
+
+    # ---- Installment Logic ----
+    installment_plan = None
+    if claim_amount > 1_500_000 or sentiment_label == "negative":
+        installment_plan = {
+            "recommended_installments": 3,
+            "per_installment": int(opening_offer / 3)
+        }
+
+    # ---- Tactical Note ----
+    dominant_feature = max(
+        feature_contribution,
+        key=lambda k: abs(feature_contribution[k])
+    )
+
+    tactical_note = f"Primary leverage factor: {dominant_feature}. "
+
+    if sentiment_label == "negative":
+        tactical_note += "Adopt de-escalation tone and propose structured repayment."
+    elif sentiment_label == "positive":
+        tactical_note += "Maintain assertive negotiation posture."
+    else:
+        tactical_note += "Proceed with balanced negotiation."
+
+    strategy = {
+        "negotiation_zone": zone,
+        "opening_offer": f"{opening_offer:,}",
+        "installment_plan": installment_plan,
+        "sentiment_detected": sentiment_label,
+        "sentiment_score": sentiment_score,
+        "tactical_note": tactical_note
     }
 
+    return strategy
+
+def analyze_sentiment(text):
+    scores = sentiment_analyzer.polarity_scores(text)
+    compound = scores["compound"]
+
+    if compound >= 0.3:
+        sentiment = "positive"
+    elif compound <= -0.3:
+        sentiment = "negative"
+    else:
+        sentiment = "neutral"
+
+    return sentiment, compound
 
 def _clean_int(val, default=0):
     """Safely convert a value to int, stripping commas and currency symbols."""
