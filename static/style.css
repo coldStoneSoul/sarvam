@@ -1,0 +1,318 @@
+    .app-container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* ── Step Indicator ── */
+    .step-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      margin-bottom: 2rem;
+    }
+
+    .step-dot {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      transition: all .3s;
+      border: 2px solid #cbd5e1;
+      color: #94a3b8;
+      background: #fff;
+      cursor: default;
+      flex-shrink: 0;
+    }
+
+    .step-dot.active {
+      border-color: #4f46e5;
+      color: #fff;
+      background: #4f46e5;
+      box-shadow: 0 0 0 4px rgba(79, 70, 229, .15);
+    }
+
+    .step-dot.done {
+      border-color: #22c55e;
+      color: #fff;
+      background: #22c55e;
+    }
+
+    .step-line {
+      width: 60px;
+      height: 3px;
+      background: #e2e8f0;
+      transition: background .3s;
+      flex-shrink: 0;
+    }
+
+    .step-line.done {
+      background: #22c55e;
+    }
+
+    .step-label {
+      font-size: 0.65rem;
+      color: #94a3b8;
+      margin-top: 4px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .step-label.active {
+      color: #4f46e5;
+      font-weight: 600;
+    }
+
+    .step-label.done {
+      color: #22c55e;
+    }
+
+    .step-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── Step Panels ── */
+    .step-panel {
+      display: none;
+      animation: fadeUp .35s ease;
+    }
+
+    .step-panel.active {
+      display: block;
+    }
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* ── Circular Chart ── */
+    .circular-chart-svg {
+      width: 120px;
+      height: 120px;
+    }
+
+    .circle-bg {
+      fill: none;
+      stroke: #e2e8f0;
+      stroke-width: 3.5;
+    }
+
+    .circle {
+      fill: none;
+      stroke: #4f46e5;
+      stroke-width: 3.5;
+      stroke-linecap: round;
+      transition: stroke-dasharray 1s ease;
+    }
+
+    .circle.high {
+      stroke: #22c55e;
+    }
+
+    .circle.medium {
+      stroke: #f59e0b;
+    }
+
+    .circle.low {
+      stroke: #ef4444;
+    }
+
+    /* ── Analysis items ── */
+    .analysis-item {
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      border-left: 4px solid #e2e8f0;
+      background: #f8fafc;
+    }
+
+    .analysis-item.impact-positive {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+    }
+
+    .analysis-item.impact-negative {
+      border-left-color: #ef4444;
+      background: #fef2f2;
+    }
+
+    .analysis-item.impact-neutral {
+      border-left-color: #f59e0b;
+      background: #fffbeb;
+    }
+
+    .impact-badge {
+      font-size: 0.65rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .impact-badge.positive {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .impact-badge.negative {
+      background: #fecaca;
+      color: #991b1b;
+    }
+
+    .impact-badge.neutral {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    /* ── Voice Input ── */
+    .voice-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .voice-input-wrapper input,
+    .voice-input-wrapper select {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .voice-mic-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2px solid #e2e8f0;
+      background: #f8fafc;
+      color: #64748b;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.25s ease;
+      flex-shrink: 0;
+    }
+
+    .voice-mic-btn:hover {
+      background: #eef2ff;
+      border-color: #818cf8;
+      color: #4f46e5;
+      transform: scale(1.08);
+    }
+
+    .voice-mic-btn.recording {
+      background: #fef2f2;
+      border-color: #ef4444;
+      color: #ef4444;
+      animation: micPulse 1.2s ease-in-out infinite;
+      box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+    }
+
+    @keyframes micPulse {
+
+      0%,
+      100% {
+        transform: scale(1);
+      }
+
+      50% {
+        transform: scale(1.12);
+      }
+    }
+
+    .voice-mic-btn:disabled {
+      background: #f1f5f9;
+      color: #cbd5e1;
+      cursor: not-allowed;
+      border-color: #e2e8f0;
+    }
+
+    /* Voice status toast */
+    .voice-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      padding: 10px 20px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      z-index: 9999;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      opacity: 0;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .voice-toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .voice-toast-info {
+      background: #eef2ff;
+      color: #3730a3;
+      border: 1px solid #c7d2fe;
+    }
+
+    .voice-toast-success {
+      background: #f0fdf4;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+
+    .voice-toast-error {
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    /* ── Negotiation Round Cards ── */
+    .neg-round-card {
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }

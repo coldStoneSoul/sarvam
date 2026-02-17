@@ -15,6 +15,7 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from services.settlement_drafter import MSMESettlementEngine
 
 # Import modular services
 from textprocessor import TextProcessor
@@ -26,7 +27,9 @@ from services.prediction import (
     jurisdictions,
 )
 from services.document import convert_document
+from services.negotiation_engine import NegotiationSessionManager
 
+negotiation_manager = NegotiationSessionManager()
 
 # ---------------------------------------------------------------------------
 # Config
@@ -559,29 +562,75 @@ def api_predict():
         return jsonify({"success": False, "error": str(e)}), 400
 
 
-@app.route("/api/generate-draft", methods=["POST"])
-def api_generate_draft():
-    """Generate settlement draft via LLM + rule-based template."""
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No data provided"}), 400
+# @app.route("/api/generate-draft", methods=["POST"])
+# def api_generate_draft():
+#     """Generate settlement draft via LLM + rule-based template."""
+#     data = request.get_json()
+#     if not data:
+#         return jsonify({"error": "No data provided"}), 400
 
-    try:
-        text_content = data.get("text_content", "")
-        case_info = data.get("case_data", {})
-        prediction = data.get("prediction", {})
+#     try:
+#         text_content = data.get("text_content", "")
+#         case_info = data.get("case_data", {})
+#         prediction = data.get("prediction", {})
 
-        # Rule-based draft
-        rule_draft = generate_settlement_draft_text({**case_info, **prediction})
+#         # Rule-based draft
+#         rule_draft = generate_settlement_draft_text({**case_info, **prediction})
 
-        # LLM draft
-        processor = TextProcessor()
-        llm_draft = processor.draft_settlement(text_content, {**case_info, **prediction})
+#         # LLM draft
+#         processor = TextProcessor()
+#         llm_draft = processor.draft_settlement(text_content, {**case_info, **prediction})
 
-        return jsonify({"success": True, "rule_draft": rule_draft, "llm_draft": llm_draft})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+#         return jsonify({"success": True, "rule_draft": rule_draft, "llm_draft": llm_draft})
+#     except Exception as e:
+#         return jsonify({"success": False, "error": str(e)}), 500
+@app.route('/api/generate-draft', methods=['POST'])
+def generate_draft():
+    data = request.json
 
+    engine = MSMESettlementEngine(
+        rbi_bank_rate=0.085,  # configurable
+    )
+
+    final_offer = data.get("final_offer")
+
+    # Compatibility: Handle both flat and nested structure
+    raw_case = data.get("case_data", {})
+    raw_pred = data.get("prediction", {})
+
+    case_data = {
+        "claim_amount": raw_case.get("claim_amount") or data.get("claim_amount"),
+        "delay_days": raw_case.get("delay_days") or data.get("delay_days"),
+        "agreed_payment_days": raw_case.get("agreed_payment_days") or data.get("agreed_payment_days"),
+        "jurisdiction": raw_case.get("jurisdiction") or data.get("jurisdiction"),
+        "case_id": raw_case.get("case_id") or raw_pred.get("case_id") or data.get("case_id", "N/A")
+    }
+
+    # Ensure we grab probability from nested object if present
+    prob = raw_pred.get("probability")
+    if prob is None:
+        prob = data.get("probability", 0.7)
+
+    prediction_data = {
+        "probability": prob
+    }
+
+    result = engine.generate(
+        case_data=case_data,
+        prediction_data=prediction_data,
+        final_offer=final_offer
+    )
+
+    return jsonify({
+        "success": True,
+        "rule_draft": result["full_text"],
+        "structured_draft": result["structured_draft"],
+        "settlement_amount": result["settlement_amount"],
+        "statutory_entitlement": result["statutory_entitlement"],
+        "interest_component": result["interest_component"],
+        "annual_interest_rate": result["annual_interest_rate"],
+        "concession_value": result["concession_value"]
+    })
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
     """Chat specifically about the provided document context."""
@@ -843,6 +892,70 @@ def export_ai_draft_pdf():
         return jsonify({'success': False, 'error': str(e)}), 400
 
 
+@app.route('/api/negotiation/start', methods=['POST'])
+def start_negotiation():
+    """Initialize multi-round negotiation"""
+    try:
+        data = request.json or {}
+        
+        # Safely convert to proper types – form values arrive as strings
+        claim_raw = str(data.get("claim_amount", "0")).replace(",", "")
+        delay_raw = str(data.get("delay_days", "0")).replace(",", "")
+        
+        case_data = {
+            "claim_amount": int(float(claim_raw)) if claim_raw else 100000,
+            "delay_days": int(float(delay_raw)) if delay_raw else 90,
+            "document_count": int(data.get("document_count", 1)),
+            "dispute_type": data.get("dispute_type", "others")
+        }
+        prediction = {
+            "probability": float(data.get("probability", 70))
+        }
+        
+        session_id = str(uuid.uuid4())[:8]
+        result = negotiation_manager.create_session(session_id, case_data, prediction)
+        result["session_id"] = session_id
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": f"Negotiation start failed: {str(e)}"}), 500
+
+@app.route('/api/negotiation/continue', methods=['POST'])
+def continue_negotiation():
+    """Process opponent counter-offer"""
+    try:
+        data = request.json or {}
+        session_id = data.get("session_id")
+        if not session_id:
+            return jsonify({"error": "Missing session_id"}), 400
+        
+        opponent_offer = int(float(str(data.get("opponent_offer", 0)).replace(",", "")))
+        if opponent_offer <= 0:
+            return jsonify({"error": "Invalid opponent offer amount"}), 400
+        
+        result = negotiation_manager.continue_session(
+            session_id,
+            opponent_offer,
+            data.get("message", "")
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": f"Negotiation continue failed: {str(e)}"}), 500
+
+
+@app.route('/api/transcribe-voice', methods=['POST'])
+def transcribe_voice():
+    """Fallback voice transcription endpoint"""
+    if 'audio' not in request.files:
+        return jsonify({"error": "No audio file provided"}), 400
+    
+    # Placeholder – return a helpful message since server-side
+    # transcription requires Whisper or similar model
+    return jsonify({
+        "text": "",
+        "fallback": True,
+        "message": "Server-side transcription not configured. Using browser Web Speech API."
+    })
 # ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------

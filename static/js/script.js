@@ -1,9 +1,15 @@
 /* ═══════════════════════════════════════════════════════════════
-   MSME Negotiation AI – Wizard Script
+   MSME Negotiation AI – Core Wizard Script
    Steps: 1 Upload → 2 Review/Edit → 3 AI Analysis → 4 Draft
+   
+   Split into modules:
+     script.js       – core wizard, upload, extraction, prediction, draft
+     chat.js         – chat sidebar with dual-context modes
+     negotiation.js  – multi-round negotiation engine
+     voice.js        – ASR/TTS voice input for form fields
    ═══════════════════════════════════════════════════════════════ */
 
-// ── State ──
+// ── State (shared across modules via globals) ──
 let currentStep = 1;
 let selectedFiles = [];
 let extractedTextContent = "";   // OCR'd text from step 1
@@ -154,6 +160,7 @@ extractBtn.addEventListener("click", async () => {
     document.getElementById("rawTextPreview").textContent = extractedTextContent.substring(0, 5000);
 
     showStepStatus(1, "success", "✅ Extraction complete! Proceeding to review…");
+    document.getElementById("chatDocBtn").style.display = "";
     setTimeout(() => goToStep(2), 600);
   } catch (err) {
     showStepStatus(1, "error", "❌ Error: " + err.message);
@@ -237,7 +244,77 @@ function renderPredictionResults(data) {
       <p class="text-xs text-gray-600 ml-7">${item.description}</p>
     </div>`;
   });
+
+  // Render Advance Tab Data
+  if (data.legal_argumentation) {
+    const la = data.legal_argumentation;
+    const statutesList = document.getElementById("adv_statutes");
+    if (statutesList) {
+      statutesList.innerHTML = (la.applicable_statutes || []).map(s =>
+        `<li class="flex items-start gap-2"><i class="fa-solid fa-book text-indigo-400 mt-1"></i><span><strong>Section ${s.section}:</strong> ${s.title}</span></li>`
+      ).join('');
+    }
+
+    if (document.getElementById("adv_legal_arg")) document.getElementById("adv_legal_arg").textContent = `"${la.legal_argument}"`;
+
+    const sb = la.statutory_breakdown || {};
+    if (document.getElementById("adv_principal")) document.getElementById("adv_principal").textContent = "₹" + (sb.principal || 0).toLocaleString();
+    if (document.getElementById("adv_interest")) document.getElementById("adv_interest").textContent = "₹" + (sb.interest || 0).toLocaleString();
+    if (document.getElementById("adv_total")) document.getElementById("adv_total").textContent = "₹" + (sb.total || 0).toLocaleString();
+  }
+
+  if (data.legal_argumentation && data.legal_argumentation.escalation_risk_assessment) {
+    const risk = data.legal_argumentation.escalation_risk_assessment;
+    if (document.getElementById("adv_risk_recommendation")) document.getElementById("adv_risk_recommendation").textContent = risk.recommendation;
+    if (document.getElementById("adv_award_prob")) document.getElementById("adv_award_prob").textContent = (risk.estimated_award_probability * 100).toFixed(0) + "%";
+    if (document.getElementById("adv_recovery")) document.getElementById("adv_recovery").textContent = risk.estimated_recovery;
+    if (document.getElementById("adv_timeline")) document.getElementById("adv_timeline").textContent = risk.timeline_if_escalated;
+    if (document.getElementById("adv_escalation_path")) document.getElementById("adv_escalation_path").textContent = risk.escalation_path;
+  }
+
+  if (data.negotiation_strategy) {
+    const ns = data.negotiation_strategy;
+    if (document.getElementById("adv_opening_offer")) document.getElementById("adv_opening_offer").textContent = "₹" + ns.opening_offer;
+    if (document.getElementById("adv_neg_zone")) document.getElementById("adv_neg_zone").textContent = ns.negotiation_zone;
+
+    if (data.legal_argumentation && data.legal_argumentation.rebuttal_strategy && document.getElementById("adv_rebuttals")) {
+      const rebuttals = data.legal_argumentation.rebuttal_strategy.split('|');
+      document.getElementById("adv_rebuttals").innerHTML = rebuttals.map(r =>
+        `<div class="text-xs bg-white p-2 border rounded text-gray-700 border-l-4 border-l-green-500">${r.trim()}</div>`
+      ).join('');
+    }
+
+    if (data.legal_argumentation && data.legal_argumentation.negotiation_script && document.getElementById("adv_negotiation_script")) {
+      document.getElementById("adv_negotiation_script").textContent = `"${data.legal_argumentation.negotiation_script}"`;
+    }
+  }
 }
+
+// Analysis Tab Switching
+window.switchAnalysisTab = function (tab) {
+  const summaryBtn = document.getElementById("tabSummaryBtn");
+  const advanceBtn = document.getElementById("tabAdvanceBtn");
+  const summaryView = document.getElementById("analysisSummary");
+  const advanceView = document.getElementById("analysisAdvance");
+
+  if (tab === 'summary') {
+    summaryBtn.classList.add("text-indigo-700", "border-b-2", "border-indigo-600");
+    summaryBtn.classList.remove("text-gray-500");
+    advanceBtn.classList.remove("text-indigo-700", "border-b-2", "border-indigo-600");
+    advanceBtn.classList.add("text-gray-500");
+
+    summaryView.classList.remove("hidden");
+    advanceView.classList.add("hidden");
+  } else {
+    advanceBtn.classList.add("text-indigo-700", "border-b-2", "border-indigo-600");
+    advanceBtn.classList.remove("text-gray-500");
+    summaryBtn.classList.remove("text-indigo-700", "border-b-2", "border-indigo-600");
+    summaryBtn.classList.add("text-gray-500");
+
+    advanceView.classList.remove("hidden");
+    summaryView.classList.add("hidden");
+  }
+};
 
 // ══════════════════════════════════════════════════════════════
 // STEP 3 → 4: GENERATE DRAFT
@@ -260,9 +337,9 @@ document.getElementById("draftBtn").addEventListener("click", async () => {
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || "Draft generation failed");
 
-    document.getElementById("llmDraftContent").innerHTML = marked.parse(data.llm_draft || "");
-    document.getElementById("ruleDraftContent").textContent = data.rule_draft || "";
-    document.getElementById("draftEditor").value = data.llm_draft || "";
+    document.getElementById("llmDraftContent").innerHTML = marked.parse(data.rule_draft || data.llm_draft || "");
+    document.getElementById("ruleDraftContent").textContent = JSON.stringify(data.structured_draft, null, 2);
+    document.getElementById("draftEditor").value = data.rule_draft || "";
 
     showStepStatus(3, "success", "✅ Draft generated!");
     setTimeout(() => goToStep(4), 500);
@@ -345,65 +422,9 @@ document.getElementById("exportAiDraftPdfBtn").addEventListener("click", async (
     alert("❌ AI Draft PDF Error: " + err.message);
   }
 });
-// ══════════════════════════════════════════════════════════════
-// CHAT SIDEBAR (preserved)
-// ══════════════════════════════════════════════════════════════
-let currentChatContext = "";
-
-sendChatBtn.addEventListener("click", () => {
-  const chatInput = document.getElementById("chatInput");
-  if (chatInput.value.trim() !== "") sendMessage();
-});
-
-function openChat() {
-  currentChatContext = extractedTextContent;
-  document.getElementById("chatSidebar").classList.remove("translate-x-full");
-}
-
-function toggleChat() {
-  document.getElementById("chatSidebar").classList.add("translate-x-full");
-}
-
-const chatInput = document.getElementById("chatInput");
-const chatMessages = document.getElementById("chatMessages");
-
-chatInput.addEventListener("keypress", async e => {
-  if (e.key === "Enter" && chatInput.value.trim() !== "") sendMessage();
-});
-
-async function sendMessage() {
-  const userMsg = chatInput.value.trim();
-  chatInput.value = "";
-  appendMessage("user", userMsg);
-  const loadingId = "loading-" + Date.now();
-  appendMessage("ai", '<span class="spinner"></span> AI is thinking...', loadingId);
-
-  try {
-    const resp = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: userMsg, context: currentChatContext }),
-    });
-    const data = await resp.json();
-    document.getElementById(loadingId).innerHTML = data.response;
-  } catch (err) {
-    document.getElementById(loadingId).innerHTML = "❌ Error: " + err.message;
-  }
-}
-
-function appendMessage(sender, text, id = null) {
-  const msgDiv = document.createElement("div");
-  msgDiv.className = sender === "user"
-    ? "bg-indigo-100 text-indigo-900 p-2 rounded-lg self-end ml-8"
-    : "bg-gray-200 text-gray-900 p-2 rounded-lg mr-8";
-  if (id) msgDiv.id = id;
-  msgDiv.innerHTML = text;
-  chatMessages.appendChild(msgDiv);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
 
 // ══════════════════════════════════════════════════════════════
-// SUMMARIZE MODAL (preserved)
+// SUMMARIZE MODAL
 // ══════════════════════════════════════════════════════════════
 const summarizeModal = document.getElementById("summarizeModal");
 const closeModal = document.getElementById("closeModal");
