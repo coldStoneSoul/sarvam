@@ -49,7 +49,7 @@ os.makedirs(config.RESULT_FOLDER, exist_ok=True)
 
 
 
-
+# Text extraction process
 def format_output(result, output_format: str):
     """Return (content_string, mimetype, extension)."""
     fmt = output_format.lower()
@@ -88,7 +88,7 @@ def index():
 # ---------------------------------------------------------------------------
 @app.route("/api/ping", methods=["GET"])
 def api_ping():
-    return jsonify({"success": True, "message": "pong"})
+    return jsonify({"success": True, "message": "pong Namaste from Team Lotus"})
 
 @app.route("/schema", methods=["GET"])
 def scheme():
@@ -116,15 +116,17 @@ def api_convert():
     ext = uploaded.filename.rsplit(".", 1)[-1].lower() if "." in uploaded.filename else ""
     if ext not in config.SUPPORTED_EXTENSIONS:
         return jsonify({"error": f"Unsupported file type: .{ext}"}), 400
-
+        # for now we made it easiar harcoded markdown for now 
     output_format = request.form.get("output_format", "markdown").lower()
     if output_format not in config.OUTPUT_FORMATS:
         return jsonify({"error": f"Unsupported output format: {output_format}"}), 400
 
+        #defaul use of OCR to avoid complexity
     use_ocr = request.form.get("use_ocr", "true").lower() in ("true", "1", "yes")
 
     try:
         file_bytes = uploaded.read()
+        # going in textprocessor.py
         result = convert_document(file_bytes, uploaded.filename, use_ocr)
         content, mimetype, out_ext = format_output(result, output_format)
 

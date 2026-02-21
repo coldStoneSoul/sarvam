@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modal — Technical Document Graph</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Inter',sans-serif;background:#0a0e1a;color:#e2e8f0;overflow:hidden;height:100vh}
+  #graph-container{width:100%;height:100vh;position:relative}
+  svg{width:100%;height:100%}
+  .link{stroke-opacity:.45;fill:none}
+  .node-circle{cursor:pointer;stroke-width:2;transition:r .2s}
+  .node-label{font-size:11px;fill:#cbd5e1;pointer-events:none;font-weight:500;text-anchor:middle}
+  .node-circle:hover{filter:brightness(1.4)}
+  /* Sidebar */
+  #sidebar{position:fixed;top:0;right:-420px;width:420px;height:100vh;background:rgba(15,20,40,.96);
+    backdrop-filter:blur(20px);border-left:1px solid rgba(99,102,241,.3);transition:right .35s ease;
+    z-index:100;padding:32px 28px;overflow-y:auto}
+  #sidebar.open{right:0}
+  #sidebar h2{font-size:22px;font-weight:700;margin-bottom:6px;background:linear-gradient(135deg,#818cf8,#6ee7b7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  #sidebar .cat{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:#818cf8;margin-bottom:16px}
+  #sidebar p{font-size:13.5px;line-height:1.7;color:#94a3b8;margin-bottom:14px}
+  #sidebar ul{padding-left:18px;margin-bottom:14px}
+  #sidebar li{font-size:13px;color:#94a3b8;margin-bottom:6px;line-height:1.6}
+  #sidebar .close-btn{position:absolute;top:18px;right:18px;background:none;border:1px solid rgba(255,255,255,.15);
+    color:#94a3b8;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+  #sidebar .close-btn:hover{background:rgba(255,255,255,.08)}
+  #sidebar .tag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;margin:2px 3px;border:1px solid}
+  /* Header */
+  #header{position:fixed;top:0;left:0;width:100%;padding:20px 32px;z-index:50;
+    background:linear-gradient(180deg,rgba(10,14,26,.95) 60%,transparent);display:flex;align-items:center;gap:16px}
+  #header h1{font-size:24px;font-weight:800;background:linear-gradient(135deg,#818cf8,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  #header span{font-size:13px;color:#64748b;font-weight:400}
+  /* Legend */
+  #legend{position:fixed;bottom:20px;left:24px;display:flex;flex-wrap:wrap;gap:10px;z-index:50}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:#64748b;background:rgba(15,20,40,.8);
+    padding:5px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.06);cursor:pointer;transition:all .2s}
+  .legend-item:hover{border-color:rgba(255,255,255,.2);color:#94a3b8}
+  .legend-dot{width:10px;height:10px;border-radius:50%}
+  /* Search */
+  #search-box{position:fixed;top:20px;right:460px;z-index:50}
+  #search-box input{background:rgba(15,20,40,.85);border:1px solid rgba(255,255,255,.1);color:#e2e8f0;
+    padding:8px 16px;border-radius:10px;font-size:13px;width:220px;outline:none;font-family:'Inter'}
+  #search-box input:focus{border-color:#818cf8}
+</style>
+</head>
+<body>
+<div id="header">
+  <h1>⬡ Modal Tech Graph</h1>
+  <span>Interactive technical document graph — click any node for details</span>
+</div>
+<div id="search-box"><input type="text" placeholder="Search nodes…" id="searchInput"></div>
+<div id="legend"></div>
+<div id="graph-container"><svg id="svg"></svg></div>
+<div id="sidebar">
+  <button class="close-btn" onclick="closeSidebar()">✕</button>
+  <div id="sidebar-content"></div>
+</div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// ── Color palette per category ──
+const CAT_COLORS = {
+  "Core Platform":"#818cf8","Architecture":"#f472b6","API Primitives":"#34d399",
+  "Compute":"#fbbf24","Storage":"#38bdf8","Networking":"#f87171",
+  "Developer Tools":"#a78bfa","Use Cases":"#fb923c","Pricing":"#4ade80",
+  "Integrations":"#e879f9","Security":"#f43f5e"
+};
+
+// ── Node data ──
+const nodes = [
+  // Root
+  {id:"modal",label:"Modal",cat:"Core Platform",r:38,
+   desc:"Modal is a serverless cloud platform for AI, ML, and data-intensive workloads. It lets you run code in containers with on-demand GPU access, sub-second cold starts, and per-second billing.",
+   details:["Founded to simplify cloud compute for AI/ML","Infrastructure-from-Code paradigm — define infra in Python","Custom Rust-based container runtime (no Docker/K8s needed)","Multi-cloud capacity pool across major providers","GA since 2024, rapidly expanding features in 2025","Python-first with JS/TS and Go SDK betas"]},
+
+  // Architecture
+  {id:"architecture",label:"Architecture",cat:"Architecture",r:24,desc:"Modal's architecture is purpose-built for speed: a Rust backend, custom filesystem, gVisor isolation, and a globally distributed storage layer.",
+   details:["100x faster than Docker cold-starts","Rust-based container stack","gVisor for secure process isolation","Network-mounted root filesystem for instant boot","Multi-cloud intelligent scheduling","Integrated logging & observability"]},
+  {id:"container_runtime",label:"Container Runtime",cat:"Architecture",r:18,desc:"Custom container runtime replacing Docker. Uses gVisor + network-mounted FS for near-instant launches.",
+   details:["gVisor sandbox for security","Images transferred to network storage pre-runtime","No Docker pull at boot time","Sub-second cold starts","Supports custom Dockerfiles for image building"]},
+  {id:"autoscaling",label:"Autoscaling",cat:"Architecture",r:16,desc:"Elastic scaling from zero to thousands of containers, driven by request load.",
+   details:["Scale to 0 when idle — no cost","Scale to 1000+ containers in seconds","Per-function independent scaling","Multi-cloud capacity optimization","No fixed quotas on Starter/Team plans"]},
+
+  // API Primitives
+  {id:"app",label:"modal.App",cat:"API Primitives",r:20,desc:"An App groups Functions and Classes into a single deployable unit — either ephemeral (script lifetime) or persistent (deployed).",
+   details:["@app.function() decorator","@app.cls() for class-based services","Ephemeral apps for scripts/notebooks","Deployed apps persist until stopped","Tags for cost tracking (Oct 2025)","Git commit info visible in dashboard"]},
+  {id:"function",label:"modal.Function",cat:"API Primitives",r:20,desc:"The basic unit of serverless execution. Decorated Python functions that auto-scale independently.",
+   details:["@app.function() decorator","Remote execution with .remote()","Async spawn with .spawn()","Up to 1M queued inputs per function","Web endpoint support","Scheduled execution (Cron/Period)","Dynamic input batching","Concurrent input handling"]},
+  {id:"cls",label:"modal.Cls",cat:"API Primitives",r:16,desc:"Class-based Modal services with lifecycle hooks for stateful workloads like model serving.",
+   details:["@app.cls() decorator","@modal.enter — initialization hook","@modal.exit — cleanup hook","@modal.method — expose methods","Parametrization with modal.parameter","Ideal for GPU model caching"]},
+  {id:"image",label:"modal.Image",cat:"API Primitives",r:20,desc:"Defines the container environment — packages, system deps, env vars. Chainable builder methods.",
+   details:[".pip_install() — Python packages",".apt_install() — system packages",".from_dockerfile() — custom Docker",".from_registry() — private registries",".run_commands() — arbitrary shell","uv_sync / uv_pip_install (Aug 2025)","Image caching for fast rebuilds"]},
+  {id:"sandbox",label:"modal.Sandbox",cat:"API Primitives",r:17,desc:"Secure isolated environment for running arbitrary or untrusted code — LLM-generated code, user submissions, etc.",
+   details:["modal.Sandbox.create()","ContainerProcess for command execution","FileIO for filesystem access","idle_timeout parameter (Sep 2025)","Connect Tokens for HTTP/WS (Oct 2025)","Same infra as Functions — fast cold starts","GPU access in sandboxes"]},
+  {id:"secret",label:"modal.Secret",cat:"API Primitives",r:14,desc:"Securely inject credentials and API keys into containers as environment variables.",
+   details:["Create via dashboard, CLI, or code","Injected as env vars at runtime","Referenced in @app.function(secrets=[…])","Workspace-level management"]},
+
+  // Compute / GPUs
+  {id:"gpu_compute",label:"GPU Compute",cat:"Compute",r:22,desc:"On-demand access to NVIDIA GPUs from T4 to B200. Specify GPU type in code, Modal handles provisioning.",
+   details:["Cloud-agnostic GPU provisioning","Up to 8 GPUs per container","gpu= parameter in @app.function","GPU memory snapshots (Aug 2025) — 10x faster cold boot","Multi-GPU for distributed training"]},
+  {id:"gpu_b200",label:"B200",cat:"Compute",r:12,desc:"NVIDIA B200 — latest Blackwell architecture. $0.001736/sec. Up to 8 per container."},
+  {id:"gpu_h200",label:"H200",cat:"Compute",r:12,desc:"NVIDIA H200 — 141GB HBM3e. $0.001261/sec. Up to 8 per container."},
+  {id:"gpu_h100",label:"H100",cat:"Compute",r:13,desc:"NVIDIA H100 — 80GB HBM3. $0.001097/sec. The workhorse for LLM training/inference. Up to 8 per container."},
+  {id:"gpu_a100",label:"A100 (40/80GB)",cat:"Compute",r:12,desc:"NVIDIA A100 — $0.000583-$0.000694/sec. Available in 40GB and 80GB variants."},
+  {id:"gpu_l40s",label:"L40S",cat:"Compute",r:11,desc:"NVIDIA L40S — $0.000542/sec. Good balance of cost and inference performance."},
+  {id:"gpu_a10",label:"A10",cat:"Compute",r:10,desc:"NVIDIA A10 — $0.000306/sec. Up to 4 per container. Budget-friendly inference."},
+  {id:"gpu_l4",label:"L4",cat:"Compute",r:10,desc:"NVIDIA L4 — $0.000222/sec. Cost-effective for lighter inference workloads."},
+  {id:"gpu_t4",label:"T4",cat:"Compute",r:10,desc:"NVIDIA T4 — $0.000164/sec. Entry-level GPU, great for development/testing."},
+  {id:"cpu_mem",label:"CPU & Memory",cat:"Compute",r:15,desc:"CPU billed per physical core (2 vCPUs), memory per GiB. Min 0.125 cores per container.",
+   details:["CPU: ~$0.0000394/core/sec","Memory: ~$0.00000672/GiB/sec","Min 0.125 cores per container","Configurable per function"]},
+
+  // Storage
+  {id:"volume",label:"modal.Volume",cat:"Storage",r:18,desc:"High-performance distributed filesystem. Ideal for model weights, datasets. Write-once, read-many pattern.",
+   details:["Explicit commit/reload semantics","Volumes v2 (Oct 2025 beta) — higher throughput","True high-concurrency writes","No file limit in v2","Terabyte-scale datasets","Mount at any path in container"]},
+  {id:"cloud_bucket",label:"CloudBucketMount",cat:"Storage",r:13,desc:"Mount S3/GCS/R2 buckets directly into containers for seamless cloud storage access."},
+  {id:"nfs",label:"NetworkFileSystem",cat:"Storage",r:13,desc:"POSIX-compliant shared filesystem for read-write workloads across containers."},
+  {id:"dict",label:"modal.Dict",cat:"Storage",r:14,desc:"Distributed key-value store — like a Python dict in the cloud. Entries expire after 7 days of inactivity.",
+   details:["Concurrent access from anywhere","Persisted across redeployments","7-day inactivity expiration (post May 2025)","New properties/methods in 2025 client"]},
+  {id:"queue",label:"modal.Queue",cat:"Storage",r:14,desc:"Distributed FIFO queue for inter-function communication. Multi-producer, multi-consumer.",
+   details:["Partitioned by key","24-hour partition inactivity cleanup","Not for persistent storage","Ideal for task coordination"]},
+
+  // Networking
+  {id:"web_endpoints",label:"Web Endpoints",cat:"Networking",r:18,desc:"Expose any Python function as an HTTPS API endpoint with a single decorator.",
+   details:["@modal.fastapi_endpoint()","@modal.asgi_app — full ASGI apps","@modal.wsgi_app — Flask/Django","@modal.web_server — custom servers","Auto-generated URLs","Custom domain support","Auto TLS certificate management","Proxy auth tokens for security"]},
+  {id:"proxy",label:"modal.Proxy",cat:"Networking",r:11,desc:"Static IP proxy for outbound traffic from containers. Available on Team+ plans."},
+  {id:"forward",label:"modal.forward",cat:"Networking",r:11,desc:"Port forwarding — expose container ports to the internet for development/debugging."},
+
+  // Dev Tools
+  {id:"notebooks",label:"Modal Notebooks",cat:"Developer Tools",r:18,desc:"Cloud-hosted Jupyter environment with instant GPU access, real-time collaboration, serverless pricing.",
+   details:["Instant kernel startup (<5 sec)","On-demand GPU access (L4 to H100 clusters)","Real-time collaborative editing","Direct access to Volumes & Secrets","Serverless — pay only for active compute","Beta released 2025"]},
+  {id:"cli",label:"Modal CLI",cat:"Developer Tools",r:14,desc:"Command-line tool for deploying, managing, and monitoring Modal apps.",
+   details:["modal run — execute scripts","modal deploy — persist deployments","modal serve — dev server with hot reload","modal setup — authentication","modal volume — manage storage"]},
+  {id:"service_tokens",label:"Service Tokens",cat:"Developer Tools",r:12,desc:"API tokens for automated deployments (CI/CD). Created by workspace managers. Aug 2025."},
+  {id:"browser_exec",label:"Browser Execution",cat:"Developer Tools",r:12,desc:"Auto-generated UI from function type annotations. Test and trigger functions from browser. Beta."},
+  {id:"scheduling",label:"Scheduling",cat:"Developer Tools",r:14,desc:"Run functions on a schedule with Cron expressions or Period intervals.",
+   details:["modal.Cron('0 */6 * * *')","modal.Period(hours=1)","Unlimited cron jobs on Team+"]},
+  {id:"retries",label:"Retries",cat:"Developer Tools",r:11,desc:"Configurable retry policies for fault-tolerant function execution."},
+  {id:"batched",label:"Dynamic Batching",cat:"Developer Tools",r:12,desc:"@modal.batched — automatically batch incoming inputs for efficient GPU utilization."},
+  {id:"concurrent",label:"Concurrency",cat:"Developer Tools",r:12,desc:"@modal.concurrent — handle multiple inputs per container for I/O-bound workloads."},
+
+  // Use Cases
+  {id:"llm_inference",label:"LLM Inference",cat:"Use Cases",r:18,desc:"Deploy OpenAI-compatible LLM endpoints with vLLM. Auto-scale to thousands of concurrent requests.",
+   details:["vLLM integration","Streaming support","<10ms Modal overhead","Scale from 0 to 1000s of containers","Used by Suno for production inference"]},
+  {id:"fine_tuning",label:"Fine-Tuning",cat:"Use Cases",r:16,desc:"Fine-tune LLMs, diffusion models, and speech models on Modal GPUs. Hugging Face TRL support.",
+   details:["Llama, Mistral, Flux fine-tuning","Domain-specific datasets","Structured output training","Whisper fine-tuning"]},
+  {id:"batch_processing",label:"Batch Processing",cat:"Use Cases",r:16,desc:"Spawn up to 1M jobs per function. Fault-tolerant, massively parallel batch execution.",
+   details:["1M input queue capacity (Apr 2025)","7-day result persistence","Audio/video transcription at scale","Scientific computation (protein folding)"]},
+  {id:"data_pipelines",label:"Data Pipelines",cat:"Use Cases",r:15,desc:"ETL workflows, dataset preprocessing, and scheduled data tasks. Integrates with dlt, dbt.",
+   details:["Postgres → Snowflake pipelines","Scheduled cron jobs","Volume-backed data persistence","Chained function workflows"]},
+  {id:"web_scraping",label:"Web Scraping",cat:"Use Cases",r:13,desc:"Parallel web scraping with auto-scaling workers and Secrets for API integration."},
+  {id:"coding_agents",label:"Coding Agents",cat:"Use Cases",r:14,desc:"Build AI coding agents using Sandboxes + LangGraph. Safe code execution for LLM-generated code."},
+
+  // Pricing
+  {id:"pricing",label:"Pricing",cat:"Pricing",r:20,desc:"Usage-based per-second billing. Three tiers: Starter (free), Team ($250/mo), Enterprise (custom).",
+   details:["Starter: $30/mo free credits, 100 containers, 10 GPU concurrency","Team: $250/mo + usage, $100 credits, 1000 containers, 50 GPU concurrency","Enterprise: custom, volume discounts, SOC2/HIPAA, Okta SSO","Startup grants up to $25k","Academic grants up to $10k","No charge when scaled to zero"]},
+
+  // Integrations
+  {id:"python_sdk",label:"Python SDK",cat:"Integrations",r:16,desc:"Primary SDK. pip install modal. Full-featured with decorators, type hints, and async support."},
+  {id:"js_go_sdk",label:"JS/Go SDKs",cat:"Integrations",r:13,desc:"Beta SDKs (Oct 2025) for JavaScript/TypeScript and Go. Unified Client object, resource management."},
+  {id:"fastapi",label:"FastAPI",cat:"Integrations",r:12,desc:"First-class FastAPI integration via @modal.fastapi_endpoint() decorator."},
+  {id:"flask_django",label:"Flask / Django",cat:"Integrations",r:12,desc:"WSGI support for Flask and Django apps via @modal.wsgi_app()."},
+
+  // Security
+  {id:"security",label:"Security",cat:"Security",r:17,desc:"Enterprise-grade security with gVisor isolation, SOC2/HIPAA compliance, and audit logging.",
+   details:["gVisor container isolation","SOC2 Type II compliant","HIPAA compliance (Enterprise)","Okta SSO integration","Audit logs","Data-residency controls","Proxy auth for web endpoints"]},
+  {id:"oci_partnership",label:"OCI Partnership",cat:"Security",r:12,desc:"Partnership with Oracle Cloud Infrastructure since Sep 2024 for bare-metal GPU instances."},
+];
+
+// ── Edges ──
+const links = [
+  // Core → top-level categories
+  {s:"modal",t:"architecture"},{s:"modal",t:"app"},{s:"modal",t:"gpu_compute"},
+  {s:"modal",t:"pricing"},{s:"modal",t:"security"},{s:"modal",t:"notebooks"},
+  {s:"modal",t:"web_endpoints"},{s:"modal",t:"python_sdk"},
+
+  // Architecture
+  {s:"architecture",t:"container_runtime"},{s:"architecture",t:"autoscaling"},
+
+  // API Primitives
+  {s:"app",t:"function"},{s:"app",t:"cls"},{s:"app",t:"image"},
+  {s:"app",t:"secret"},{s:"app",t:"sandbox"},
+  {s:"function",t:"scheduling"},{s:"function",t:"retries"},
+  {s:"function",t:"batched"},{s:"function",t:"concurrent"},
+  {s:"cls",t:"function"},
+
+  // Compute
+  {s:"gpu_compute",t:"gpu_b200"},{s:"gpu_compute",t:"gpu_h200"},{s:"gpu_compute",t:"gpu_h100"},
+  {s:"gpu_compute",t:"gpu_a100"},{s:"gpu_compute",t:"gpu_l40s"},{s:"gpu_compute",t:"gpu_a10"},
+  {s:"gpu_compute",t:"gpu_l4"},{s:"gpu_compute",t:"gpu_t4"},{s:"gpu_compute",t:"cpu_mem"},
+
+  // Storage
+  {s:"modal",t:"volume"},{s:"volume",t:"cloud_bucket"},{s:"volume",t:"nfs"},
+  {s:"modal",t:"dict"},{s:"modal",t:"queue"},
+
+  // Networking
+  {s:"web_endpoints",t:"proxy"},{s:"web_endpoints",t:"forward"},
+  {s:"web_endpoints",t:"fastapi"},{s:"web_endpoints",t:"flask_django"},
+
+  // Dev Tools
+  {s:"notebooks",t:"cli"},{s:"notebooks",t:"service_tokens"},
+  {s:"cli",t:"browser_exec"},
+
+  // Use Cases
+  {s:"gpu_compute",t:"llm_inference"},{s:"gpu_compute",t:"fine_tuning"},
+  {s:"function",t:"batch_processing"},{s:"function",t:"data_pipelines"},
+  {s:"function",t:"web_scraping"},{s:"sandbox",t:"coding_agents"},
+  {s:"llm_inference",t:"fine_tuning"},
+
+  // Integrations
+  {s:"python_sdk",t:"js_go_sdk"},
+
+  // Security
+  {s:"security",t:"oci_partnership"},
+  {s:"container_runtime",t:"security"},
+
+  // Cross-links
+  {s:"volume",t:"llm_inference"},{s:"image",t:"container_runtime"},
+  {s:"notebooks",t:"volume"},{s:"pricing",t:"gpu_compute"},
+];
+
+// ── Build Legend ──
+const legendEl = document.getElementById('legend');
+Object.entries(CAT_COLORS).forEach(([cat,col])=>{
+  const d = document.createElement('div');d.className='legend-item';
+  d.innerHTML=`<span class="legend-dot" style="background:${col}"></span>${cat}`;
+  d.onclick=()=>{
+    const match = nodes.find(n=>n.cat===cat);
+    if(match){ const nd=nodeEls.filter(n=>n.id===match.id);if(nd.size()) openSidebar(match); }
+  };
+  legendEl.appendChild(d);
+});
+
+// ── D3 Setup ──
+const width = window.innerWidth, height = window.innerHeight;
+const svg = d3.select('#svg').attr('viewBox',[0,0,width,height]);
+
+const defs = svg.append('defs');
+// Glow filter
+const glow = defs.append('filter').attr('id','glow');
+glow.append('feGaussianBlur').attr('stdDeviation','3').attr('result','blur');
+glow.append('feMerge').selectAll('feMergeNode').data(['blur','SourceGraphic']).enter().append('feMergeNode').attr('in',d=>d);
+
+const g = svg.append('g');
+
+// Zoom
+const zoom = d3.zoom().scaleExtent([.3,4]).on('zoom',e=>g.attr('transform',e.transform));
+svg.call(zoom);
+
+const linkData = links.map(l=>({source:l.s,target:l.t}));
+
+const sim = d3.forceSimulation(nodes)
+  .force('link',d3.forceLink(linkData).id(d=>d.id).distance(d=>{
+    const sr=(nodes.find(n=>n.id===(typeof d.source==='object'?d.source.id:d.source))||{}).r||14;
+    return sr>20?160:120;
+  }).strength(.4))
+  .force('charge',d3.forceManyBody().strength(d=>-d.r*28))
+  .force('center',d3.forceCenter(width/2,height/2))
+  .force('collision',d3.forceCollide().radius(d=>d.r+12));
+
+const linkEls = g.selectAll('.link').data(linkData).enter().append('line')
+  .attr('class','link').attr('stroke',d=>{
+    const src = typeof d.source==='object'?d.source:nodes.find(n=>n.id===d.source);
+    return CAT_COLORS[src.cat]||'#334155';
+  }).attr('stroke-width',1.2);
+
+const nodeG = g.selectAll('.node').data(nodes).enter().append('g').attr('class','node')
+  .call(d3.drag().on('start',(e,d)=>{if(!e.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y})
+    .on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y}).on('end',(e,d)=>{if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null}));
+
+const nodeEls = nodeG.append('circle').attr('class','node-circle').attr('r',d=>d.r)
+  .attr('fill',d=>CAT_COLORS[d.cat]||'#64748b').attr('stroke',d=>CAT_COLORS[d.cat]||'#64748b')
+  .attr('fill-opacity',.2).attr('filter','url(#glow)')
+  .on('click',(e,d)=>openSidebar(d));
+
+nodeG.append('text').attr('class','node-label').attr('dy',d=>d.r+14).text(d=>d.label);
+
+sim.on('tick',()=>{
+  linkEls.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
+  nodeG.attr('transform',d=>`translate(${d.x},${d.y})`);
+});
+
+// ── Sidebar ──
+function openSidebar(d){
+  const el = document.getElementById('sidebar-content');
+  let html=`<div class="cat">${d.cat}</div><h2>${d.label}</h2><p>${d.desc}</p>`;
+  if(d.details){html+=`<ul>${d.details.map(x=>`<li>${x}</li>`).join('')}</ul>`;}
+  // Show connected nodes
+  const connected = links.filter(l=>l.s===d.id||l.t===d.id).map(l=>l.s===d.id?l.t:l.s);
+  if(connected.length){
+    html+=`<p style="color:#818cf8;font-weight:600;margin-top:12px">Connected Nodes</p><div>`;
+    connected.forEach(cid=>{const n=nodes.find(x=>x.id===cid);if(n)html+=`<span class="tag" style="color:${CAT_COLORS[n.cat]};border-color:${CAT_COLORS[n.cat]}40">${n.label}</span>`;});
+    html+=`</div>`;
+  }
+  el.innerHTML=html;
+  document.getElementById('sidebar').classList.add('open');
+  // Highlight
+  nodeEls.attr('fill-opacity',n=>n.id===d.id||connected.includes(n.id)?.45:.08);
+  linkEls.attr('stroke-opacity',l=>{const si=typeof l.source==='object'?l.source.id:l.source;const ti=typeof l.target==='object'?l.target.id:l.target;return si===d.id||ti===d.id?.8:.06;});
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  nodeEls.attr('fill-opacity',.2);linkEls.attr('stroke-opacity',.45);
+}
+
+// ── Search ──
+document.getElementById('searchInput').addEventListener('input',function(){
+  const q=this.value.toLowerCase();
+  if(!q){nodeEls.attr('fill-opacity',.2);linkEls.attr('stroke-opacity',.45);return;}
+  nodeEls.attr('fill-opacity',d=>d.label.toLowerCase().includes(q)||d.cat.toLowerCase().includes(q)?.5:.04);
+});
+</script>
+</body>
+</html>

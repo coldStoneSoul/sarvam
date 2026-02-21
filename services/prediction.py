@@ -1,6 +1,7 @@
 import os
 import json
 import pandas as pd
+import datetime
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from xgboost import XGBClassifier
@@ -206,7 +207,7 @@ OPTIMAL_THRESHOLD = 0.607
 
 def run_xgb_prediction(claim_amount, delay_days, document_count, dispute_type, jurisdiction):
     """Run XGBoost prediction and return full results dict."""
-
+    start_time = datetime.datetime.now();
     document_score = document_count / 4
 
     try:
@@ -306,7 +307,10 @@ def run_xgb_prediction(claim_amount, delay_days, document_count, dispute_type, j
     except Exception as e:
         print(f"Error logging prediction: {e}")
         case_id = None
-
+    # Refined timing log for your technical report
+    end_time = datetime.datetime.now();
+    duration_ms = (end_time - start_time).total_seconds() * 1000
+    print(f"Prediction Latency: {duration_ms:.2f}ms")
     return {
         "success": True,
         "probability": round(probability * 100, 2),
