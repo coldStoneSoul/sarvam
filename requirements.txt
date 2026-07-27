@@ -1,5 +1,24 @@
-docling
+# Core Framework
 flask
-pyyaml
+
+# Document Processing
+docling
+
+# ML & Data
+xgboost
+scikit-learn
+pandas
+numpy
+joblib
+
+# LLM Integration
 openai
+
+# NLP
+vaderSentiment
+
+# PDF Export
 reportlab
+
+# Config
+pyyaml

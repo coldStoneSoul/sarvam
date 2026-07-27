@@ -132,39 +132,70 @@ function showStepStatus(stepNum, type, msg) {
 extractBtn.addEventListener("click", async () => {
   if (!selectedFiles.length) return;
   extractBtn.disabled = true;
-  showStepStatus(1, "loading", '<span class="spinner"></span> Extracting case data from document… this may take a moment.');
+  
+  extractedTextContent = "";
+  let mergedFields = null;
 
-  const formData = new FormData();
-  formData.append("file", selectedFiles[0]);  // use first file for extraction
-
-  try {
-    const resp = await fetch("/api/extract-fields", { method: "POST", body: formData });
-    if (!resp.ok) {
-      const err = await resp.json();
-      throw new Error(err.error || "Extraction failed");
+  for (let i = 0; i < selectedFiles.length; i++) {
+    const file = selectedFiles[i];
+    showStepStatus(1, "loading", `<span class="spinner"></span> Extracting case data from ${file.name} (${i + 1}/${selectedFiles.length})…`);
+    
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    try {
+      const resp = await fetch("/api/extract-fields", { method: "POST", body: formData });
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.error || "Extraction failed");
+      }
+      const data = await resp.json();
+      
+      // Append text content with the filename
+      extractedTextContent += `\n\n--- Document: ${file.name} ---\n\n` + (data.text_content || "");
+      
+      // Merge or initialize fields
+      if (!mergedFields) {
+        mergedFields = data.fields;
+      } else {
+        mergedFields.claim_amount = Math.max(mergedFields.claim_amount || 0, data.fields.claim_amount || 0);
+        mergedFields.delay_days = Math.max(mergedFields.delay_days || 0, data.fields.delay_days || 0);
+        if (!mergedFields.dispute_type && data.fields.dispute_type) mergedFields.dispute_type = data.fields.dispute_type;
+        if (!mergedFields.jurisdiction && data.fields.jurisdiction) mergedFields.jurisdiction = data.fields.jurisdiction;
+      }
+    } catch (err) {
+      console.error(`Error extracting ${file.name}:`, err);
+      // Briefly show the error, then continue to the next file
+      showStepStatus(1, "error", `❌ Error in ${file.name}: ${err.message}. Continuing...`);
+      await new Promise(r => setTimeout(r, 1500));
     }
-    const data = await resp.json();
-
-    // Store extracted text
-    extractedTextContent = data.text_content || "";
-
-    // Populate editable fields
-    const f = data.fields;
-    document.getElementById("edit_claim_amount").value = f.claim_amount || 100000;
-    document.getElementById("edit_delay_days").value = f.delay_days || 100;
-    setSelectValue("edit_document_count", String(f.document_count || 1));
-    setSelectValue("edit_dispute_type", f.dispute_type || "");
-    setSelectValue("edit_jurisdiction", f.jurisdiction || "");
-
-    // Show raw text
-    document.getElementById("rawTextPreview").textContent = extractedTextContent.substring(0, 5000);
-
-    showStepStatus(1, "success", "✅ Extraction complete! Proceeding to review…");
-    document.getElementById("chatDocBtn").style.display = "";
-    setTimeout(() => goToStep(2), 600);
-  } catch (err) {
-    showStepStatus(1, "error", "❌ Error: " + err.message);
   }
+
+  if (!mergedFields) {
+    showStepStatus(1, "error", "❌ Extraction failed for all files.");
+    extractBtn.disabled = false;
+    return;
+  }
+
+  // Populate editable fields
+  document.getElementById("edit_claim_amount").value = mergedFields.claim_amount || 100000;
+  document.getElementById("edit_delay_days").value = mergedFields.delay_days || 100;
+  
+  // Update document count based on actual files processed
+  let docCount = selectedFiles.length;
+  if (docCount > 4) docCount = 4;
+  setSelectValue("edit_document_count", String(docCount));
+  
+  setSelectValue("edit_dispute_type", mergedFields.dispute_type || "");
+  setSelectValue("edit_jurisdiction", mergedFields.jurisdiction || "");
+
+  // Show raw text
+  document.getElementById("rawTextPreview").textContent = extractedTextContent.substring(0, 5000);
+
+  showStepStatus(1, "success", "✅ Extraction complete! Proceeding to review…");
+  document.getElementById("chatDocBtn").style.display = "";
+  setTimeout(() => goToStep(2), 600);
+  
   extractBtn.disabled = false;
 });
 

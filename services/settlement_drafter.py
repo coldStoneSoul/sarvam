@@ -15,16 +15,16 @@ class MSMESettlementEngine:
     - Optional LLM polish (isolated)
     """
 
-    def __init__(self, rbi_bank_rate: float = 0.085,
+    def __init__(self, rbi_bank_rate: float = 0.055,
                  api_key: Optional[str] = None,
-                 model: str = "ai/granite-4.0-micro",
+                 model: str = None,
                  base_url: Optional[str] = None):
 
-        # RBI bank rate (e.g., 8.5% = 0.085)
+        # RBI Bank Rate as of July 2026 — 5.5% (MPC June 2026). Update if RBI revises.
         self.rbi_bank_rate = rbi_bank_rate
         self.api_key = api_key or os.getenv("OPENAI_API_KEY") or "not-needed"
-        self.model = model
-        self.base_url = base_url or os.getenv("MODEL_RUNNER_URL", "http://localhost:12434/v1")
+        self.model = model or os.getenv("MODEL_FOR_ANALYSIS", "ai/granite-4.0-h-micro")
+        self.base_url = base_url or os.getenv("BASE_URL", "http://localhost:12434/v1")
 
         try:
             self.llm_client = OpenAI(
@@ -232,7 +232,7 @@ class MSMESettlementEngine:
             f"(3× RBI bank rate). "
             f"Total statutory entitlement: ₹{statutory['total']:,.2f} "
             f"(Principal ₹{statutory['principal']:,.2f} "
-            f"+ Interest ₹{statutary_interest(statutory):,.2f})."
+            f"+ Interest ₹{statutory['interest']:,.2f})."
         )
 
     # helper to avoid key typo crash

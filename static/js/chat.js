@@ -83,19 +83,59 @@ async function sendMessage() {
             body: JSON.stringify({ message: userMsg, context: currentChatContext }),
         });
         const data = await resp.json();
-        document.getElementById(loadingId).innerHTML = marked.parse(data.response || data.error || "No response");
+        const rawText = data.response || data.error || "No response";
+        const bubble = document.getElementById(loadingId);
+        // Replace loading content with markdown + copy button
+        renderAiBubble(bubble, rawText);
     } catch (err) {
         document.getElementById(loadingId).innerHTML = "❌ Error: " + err.message;
     }
 }
 
+// ── Render markdown + copy button into an AI bubble element ──
+function renderAiBubble(el, rawText) {
+    const markdownHtml = marked.parse(rawText);
+    el.innerHTML = `
+        <div class="chat-md-body p-3">${markdownHtml}</div>
+        <div class="chat-copy-bar px-3 pb-2">
+            <button class="chat-copy-btn text-xs text-gray-500 hover:text-indigo-600" title="Copy response" onclick="copyChatMessage(this, ${JSON.stringify(rawText).replace(/"/g, '&quot;')})">
+                <i class="fa-regular fa-copy"></i> Copy
+            </button>
+        </div>`;
+}
+
+// ── Copy text to clipboard ──
+function copyChatMessage(btn, text) {
+    navigator.clipboard.writeText(text).then(() => {
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy';
+            btn.classList.remove('copied');
+        }, 2000);
+    }).catch(() => {
+        btn.textContent = 'Failed';
+    });
+}
+
+// ── Append a message bubble ──
 function appendMessage(sender, text, id = null) {
     const msgDiv = document.createElement("div");
-    msgDiv.className = sender === "user"
-        ? "bg-indigo-100 text-indigo-900 p-3 rounded-lg self-end ml-8"
-        : "bg-gray-100 text-gray-900 p-3 rounded-lg mr-8";
-    if (id) msgDiv.id = id;
-    msgDiv.innerHTML = text;
+    if (sender === "user") {
+        msgDiv.className = "bg-indigo-100 text-indigo-900 p-3 rounded-lg self-end ml-8";
+        if (id) msgDiv.id = id;
+        msgDiv.textContent = text; // user messages: plain text (safe)
+    } else {
+        msgDiv.className = "ai-chat-bubble bg-gray-100 text-gray-900 rounded-lg mr-4";
+        if (id) msgDiv.id = id;
+        // If it's a loading placeholder, set innerHTML directly
+        if (text.includes('spinner') || text.includes('❌')) {
+            msgDiv.innerHTML = `<div class="p-3">${text}</div>`;
+        } else {
+            // Normal AI message — render markdown + copy button immediately
+            renderAiBubble(msgDiv, text);
+        }
+    }
     chatMessages.appendChild(msgDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }

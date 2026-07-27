@@ -15,29 +15,36 @@ class TextProcessor:
     def __init__(
         self, 
         api_key: Optional[str] = None, 
-        model: str = "ai/granite-4.0-micro",
+        model: str = None,
         base_url: Optional[str] = None
     ):
         """
         Initialize the TextProcessor with Docker Model Runner or OpenAI API.
         
-        Args:
-            api_key: API key (if None, reads from OPENAI_API_KEY env var, or "not-needed" for local)
-            model: Model to use for summarization (default: docker.io/granite-4.0-nano:350M-BF16)
-            base_url: Base URL for the API (default: http://localhost:8080/v1 for Docker Model Runner)
+        Three model slots, each configurable via .env:
+          MODEL_FOR_CHAT      – conversational chat (default: ai/granite-4.0-h-micro)
+          MODEL_FOR_ANALYSIS  – extraction + reasoning (default: ai/granite-4.0-h-micro)
+          MODEL_FOR_SUMMARIZE – fast summarization (default: ai/granite-4.0-h-nano)
         """
-        # For Docker Model Runner, API key is not required but OpenAI client needs something
         self.api_key = api_key or os.getenv("OPENAI_API_KEY") or "not-needed"
-        
-        # Default to Docker Model Runner URL if not specified
-        self.base_url = base_url or os.getenv("MODEL_RUNNER_URL", "http://localhost:12434/v1")
-        
-        # Initialize OpenAI client with custom base URL for Docker Model Runner
+        self.base_url = base_url or os.getenv("BASE_URL", "http://localhost:12434/v1")
+
         self.client = OpenAI(
             api_key=self.api_key,
             base_url=self.base_url
         )
-        self.model = model
+
+        # If caller passes an explicit model, use it everywhere (backward compat)
+        # Otherwise read per-task env vars
+        _default_analysis  = os.getenv("MODEL_FOR_ANALYSIS",  "ai/granite-4.0-h-micro")
+        _default_chat      = os.getenv("MODEL_FOR_CHAT",      "ai/granite-4.0-h-micro")
+        _default_summarize = os.getenv("MODEL_FOR_SUMMARIZE", "ai/granite-4.0-h-nano")
+
+        self.model          = model or _default_chat      # legacy fallback
+        self.chat_model     = model or _default_chat
+        self.analysis_model = model or _default_analysis  # used for extraction & reasoning
+        self.summarize_model= model or _default_summarize # used for summarize/key-points
+
     
     def summarize(
         self,
@@ -73,7 +80,7 @@ class TextProcessor:
         
         try:
             response = self.client.chat.completions.create(
-                model=self.model,
+                model=self.summarize_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": f"Please summarize the following text:\n\n{text}"}
@@ -120,7 +127,7 @@ class TextProcessor:
         
         try:
             response = self.client.chat.completions.create(
-                model=self.model,
+                model=self.summarize_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": text}
@@ -163,7 +170,7 @@ class TextProcessor:
         """
         try:
             response = self.client.chat.completions.create(
-                model=self.model,
+                model=self.analysis_model,
                 messages=[
                     {"role": "system", "content": "You are a helpful text analysis assistant."},
                     {"role": "user", "content": f"{instruction}\n\nText:\n{text}"}
@@ -186,80 +193,126 @@ class TextProcessor:
             raise RuntimeError(f"Failed to perform custom analysis: {str(e)}")
     
 
-    # Case detauls 
+    def _parse_json_response(self, content: str) -> Dict:
+        """Robustly parse JSON from LLM output, handling markdown code fences."""
+        import re
+        # Try direct parse first
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            pass
+        # Strip markdown code fences (```json ... ``` or ``` ... ```)
+        match = re.search(r'```(?:json)?\s*([\s\S]+?)```', content)
+        if match:
+            try:
+                return json.loads(match.group(1).strip())
+            except json.JSONDecodeError:
+                pass
+        # Try to find first { ... } block
+        match = re.search(r'(\{[\s\S]+\})', content)
+        if match:
+            try:
+                return json.loads(match.group(1))
+            except json.JSONDecodeError:
+                pass
+        raise ValueError(f"Could not parse JSON from model response: {content[:300]}")
+
+    # Case details
     def extract_case_details(self, text: str) -> Dict[str, Any]:
         """Extracts specific legal/dispute fields for the XGBoost model."""
         system_prompt = (
-            "Role: You are a high-precision Legal & Financial Data Extractor."
-            "Task: Extract required fields from the input text and return ONLY a valid JSON object. Follow the specific logic rules for financial calculations and entity recognition."
-            "Execution Logic Rules:"
-            "- claim_amount: If a specific disputed amount is not stated, calculate it based on contract clauses. Return raw integers only. No commas, no currency symbols."
-            "- document_count: Increment this for every distinct record, report, or evidence mentioned (e.g., Invoice, SLA Extract, Incident Report, Log, Email)."
-            "- jurisdiction: Extract or infer the Indian State in Title Case based on city or office locations mentioned."
-            "- dispute_type: Use 'others' for quality/SLA disputes; 'service_non_payment' only if the work was accepted but unpaid."
-            "- delay_days: Extract the number of days mentioned for outages, late deliveries, or payment delays."
-            "Fields:"
-            "- is_legal_case (boolean)"
-            "- case_id (string)"
-            "- claim_amount (integer)"
-            "- delay_days (integer)"
-            "- document_count (integer)"
-            "- dispute_type (string, one of: goods_rejection, service_non_payment, invoice_non_payment, short_payment, interest_on_delay, others)\n"
-            "- jurisdiction (string, standard Indian State name in Title Case)"
-            "- document_score (integer 0-10)"
-            "- clarify (string: single sentence explaining the logic used for the extracted values)"
-            "- confidence_level (integer 0-10)"
-            "Constraint: Return ONLY the JSON object. Do NOT include extra text, explanations, or markdown outside the JSON."
+            "Role: You are a high-precision Legal & Financial Data Extractor for Indian MSME dispute cases."
+            "Task: Extract required fields from the input text and return ONLY a valid JSON object."
+            "\n"
+            "FIELD EXTRACTION RULES:\n"
+            "\n"
+            "claim_amount (integer, no commas/symbols):\n"
+            "  - If an explicit disputed/claimed amount is stated, use it directly.\n"
+            "  - SLA credit disputes: credit = (credit_percentage / 100) * total_invoice_amount. NEVER multiply by hours or days.\n"
+            "    Example: 15% credit on ₹1,12,100 = 0.15 * 112100 = 16815. NOT 9 * 0.15 * 112100.\n"
+            "  - Late delivery penalty: penalty = (penalty_pct / 100) * invoice_amount, capped at stated maximum.\n"
+            "  - Payment disputes: use the unpaid invoice total.\n"
+            "\n"
+            "delay_days (integer):\n"
+            "  - For payment delays: extract the number of days overdue from due date to filing date.\n"
+            "  - For outages/downtime: convert hours to days by dividing by 24 and ROUNDING UP. Example: 9 hours = ceil(9/24) = 1 day.\n"
+            "  - For delivery delays: count calendar days between contractual and actual delivery date.\n"
+            "\n"
+            "dispute_type (must be exactly one of these values):\n"
+            "  - 'others': SLA breaches, uptime credits, quality disputes, service level failures\n"
+            "  - 'service_non_payment': services rendered and accepted but invoice not paid\n"
+            "  - 'invoice_non_payment': goods delivered but invoice not paid\n"
+            "  - 'goods_rejection': buyer rejected delivered goods\n"
+            "  - 'short_payment': payment received but less than invoiced amount\n"
+            "  - 'interest_on_delay': claim is specifically for interest on delayed payment\n"
+            "  NOTE: SLA downtime credit claims = 'others', NOT 'service_non_payment'\n"
+            "\n"
+            "document_count (integer): Count every distinct evidence item (Invoice, SLA doc, Incident Report, Email, PO, MOU, etc.)\n"
+            "jurisdiction (string): Extract the Indian State name in Title Case from city/office locations.\n"
+            "document_score (integer 0-10): Rate completeness of evidence provided.\n"
+            "clarify (string): One sentence showing your exact calculation with numbers.\n"
+            "confidence_level (integer 0-10): Your confidence in the extraction.\n"
+            "\n"
+            "Constraint: Return ONLY the JSON object. No markdown, no extra text."
         )
+
         validator_prompt = (
-            "Role: You are a Strict Data Auditor. Your job is to find errors in the extracted data."
-            "Input: You will receive Source Text and an Extracted JSON object."
-            "Task: Compare the Extracted JSON against the Source Text. verification steps:"
-            "1. Check if 'claim_amount' matches the text or contract logic exactly. Recalculate if necessary."
-            "2. Verify 'delay_days' calculation. partial days should be rounded up."
-            "3. Confirm 'dispute_type' is strictly one of the allowed enum values."
-            "4. Ensure 'jurisdiction' is a valid Indian State."
-            "Output: Return a JSON object with the corrected fields and a 'corrections_made' list explaining any changes."
-            "Constraint: Return ONLY the JSON object. Do NOT include extra text, explanations, or markdown outside the JSON."
-            "Fields to return:"
-            "- is_legal_case (boolean)"
-            "- case_id (string)"
-            "- claim_amount (integer)"
-            "- delay_days (integer)"
-            "- document_count (integer)"
-            "- dispute_type (string, one of: goods_rejection, service_non_payment, invoice_non_payment, short_payment, interest_on_delay, others)\n"
-            "- jurisdiction (string, standard Indian State name in Title Case)"
-            "- document_score (integer 0-10)"
-            "- clarify (string: logic why extracted values are correct or wrong)"
-            "- is_passed"
-            "Constraint: Return ONLY the JSON object. Do NOT include extra text, explanations, or markdown outside the JSON."
+            "Role: You are a Strict Data Auditor validating extracted legal case fields.\n"
+            "\n"
+            "VALIDATION RULES — check each field:\n"
+            "\n"
+            "claim_amount:\n"
+            "  - SLA credit = (pct/100) * total_invoice. NEVER multiply by hours. Example: 15% of 112100 = 16815.\n"
+            "  - Verify the clarify field shows correct arithmetic. If wrong, recalculate and correct.\n"
+            "\n"
+            "delay_days:\n"
+            "  - Hours → days: ceil(hours / 24). Example: 9 hours → ceil(0.375) = 1 day. NOT 9.\n"
+            "  - Verify this conversion was done correctly.\n"
+            "\n"
+            "dispute_type:\n"
+            "  - SLA / uptime / downtime credit = 'others'\n"
+            "  - Must be exactly one of: goods_rejection, service_non_payment, invoice_non_payment, short_payment, interest_on_delay, others\n"
+            "\n"
+            "jurisdiction: Must be a real Indian State name.\n"
+            "\n"
+            "Output: Return a corrected JSON with all validated/corrected values plus is_passed (true/false).\n"
+            "Constraint: Return ONLY the JSON object. No markdown, no extra text."
         )
-        
+
+
         try:
             response = self.client.chat.completions.create(
-                model=self.model, # Using micro as requested
+                model=self.analysis_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": text}
                 ],
-                response_format={ "type": "json_object" }
             )
-            print("response",response.choices[0].message.content)
+            raw_response = response.choices[0].message.content
+            print("response", raw_response)
+            extracted = self._parse_json_response(raw_response)
 
-            # Updated to use client.chat instead of invalid client.think
             validate = self.client.chat.completions.create(
-                model=self.model,
+                model=self.analysis_model,
                 messages=[
-                    {"role" : "system" , "content":validator_prompt},
-                    {"role" : "user" , "content": f"Source Text:\n{text}\n\nExtracted JSON:\n{response.choices[0].message.content}"}
+                    {"role": "system", "content": validator_prompt},
+                    {"role": "user", "content": f"Source Text:\n{text}\n\nExtracted JSON:\n{raw_response}"}
                 ],
-                temperature=0.1, # Lower temperature for stricter auditing
-                response_format={ "type": "json_object" }
+                temperature=0.1,
             )
-            print("validate",validate.choices[0].message.content)
-            return json.loads(validate.choices[0].message.content)
+            raw_validate = validate.choices[0].message.content
+            print("validate", raw_validate)
+            try:
+                validated = self._parse_json_response(raw_validate)
+                # If validator says passed, use its output; else fall back to first extraction
+                return validated if validated.get("is_passed") else extracted
+            except Exception:
+                # Validator parse failed — still return the good first extraction
+                return extracted
+
         except Exception as e:
             raise RuntimeError(f"Extraction failed: {str(e)}")
+
         
     def draft_settlement(self, text: str, outcome_data: Dict) -> str:
         """Drafts a settlement based on document text and XGBoost predictions."""
@@ -271,7 +324,7 @@ class TextProcessor:
         Outcome Data: {json.dumps(outcome_data)}
         """
         response = self.client.chat.completions.create(
-            model=self.model,
+            model=self.analysis_model,
             messages=[
                 {"role": "system", "content": "You are a senior legal counsel drafting a settlement agreement."},
                 {"role": "user", "content": f"{prompt}\n\nDocument Text:\n{text}"}
@@ -282,7 +335,7 @@ class TextProcessor:
 def quick_summarize(
     text: str, 
     api_key: Optional[str] = None,
-    model: str = "docker.io/granite-4.0-nano:350M-BF16",
+    model: str = None,
     base_url: Optional[str] = None
 ) -> str:
     """

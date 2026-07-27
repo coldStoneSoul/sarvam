@@ -1,7 +1,27 @@
+# Virtual environments
 .venv
 venv
+
+# Python cache
 __pycache__
+services/__pycache__
+*.pyc
+
+# Environment & secrets
+.env
+
+# Runtime directories
 /uploads
 /results
+/logs
+
+# Logs
 *.log
-services/__pycache__
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

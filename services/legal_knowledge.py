@@ -11,8 +11,8 @@ class LegalArgumentationEngine:
     - No fake penalties
     """
 
-    # You may later fetch RBI rate dynamically
-    RBI_BANK_RATE = 0.085  # Example: 8.5% (update as required)
+    # RBI Bank Rate as of July 2026 (MPC June 2026 decision) — update if RBI changes it
+    RBI_BANK_RATE = 0.055  # 5.5% — official RBI Bank Rate (not Repo Rate)
 
     STATUTES = {
         "section_15": {

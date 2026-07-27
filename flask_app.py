@@ -642,7 +642,7 @@ def api_chat():
     
     processor = TextProcessor()
     response = processor.client.chat.completions.create(
-        model="ai/granite-4.0-micro",
+        model=processor.model,
         messages=[
             {"role": "system", "content": f"Answer based ONLY on this document:\n{doc_text}"},
             {"role": "user", "content": user_query}
